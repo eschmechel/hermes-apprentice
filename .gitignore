@@ -4,6 +4,7 @@
 !.firecracker/start-vm.sh
 !.firecracker/build-rootfs.sh
 !.firecracker/bootstrap.sh
+!.firecracker/vm.sh
 !.firecracker/.dockerignore
 !.firecracker/README.md
 .opencode/node_modules/

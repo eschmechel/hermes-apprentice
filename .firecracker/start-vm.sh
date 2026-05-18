@@ -6,12 +6,15 @@ REPO_DIR="$(cd "${FC_DIR}/.." && pwd)"
 FIRECRACKER="${FC_DIR}/firecracker"
 CONFIG_TMPL="${FC_DIR}/vm-config.json.tmpl"
 CONFIG="${FC_DIR}/vm-config.json"
+SOCK="/tmp/firecracker.sock"
 TAP_DEV="fc-tap0"
 TAP_IP="10.0.2.1"
 GUEST_IP="10.0.2.2"
 GUEST_MAC="06:00:00:00:00:01"
 NAT_SUBNET="10.0.2.0/24"
 EXPECTED_FC_VERSION="v1.15.1"
+# Match by --api-sock so bind-mount path differences don't fool pkill.
+FC_PATTERN="firecracker --api-sock ${SOCK}"
 
 echo "=== Firecracker VM Startup ==="
 
@@ -51,9 +54,9 @@ echo "Rendering vm-config.json from template with REPO_DIR=${REPO_DIR}..."
 sed "s|@REPO_DIR@|${REPO_DIR}|g" "$CONFIG_TMPL" > "$CONFIG"
 
 echo "Killing any stale Firecracker processes (they hold TAP fds)..."
-sudo pkill -KILL -f "$FIRECRACKER" 2>/dev/null || true
-pkill -KILL -f "$FIRECRACKER" 2>/dev/null || true
-rm -f /tmp/firecracker.sock
+sudo pkill -KILL -f "$FC_PATTERN" 2>/dev/null || true
+pkill -KILL -f "$FC_PATTERN" 2>/dev/null || true
+rm -f "$SOCK"
 
 echo "Setting up TAP device..."
 if ip link show "$TAP_DEV" &>/dev/null; then
@@ -85,7 +88,7 @@ sudo iptables -t nat -C POSTROUTING -s "$NAT_SUBNET" ! -o "$TAP_DEV" -j MASQUERA
 echo "Starting Firecracker VM..."
 rm -f /tmp/firecracker.log
 "$FIRECRACKER" \
-    --api-sock /tmp/firecracker.sock \
+    --api-sock "$SOCK" \
     --config-file "$CONFIG" \
     > /tmp/firecracker.log 2>&1 &
 
@@ -93,9 +96,14 @@ FC_PID=$!
 echo "Firecracker PID: $FC_PID"
 
 for i in {1..30}; do
-    if [ -S /tmp/firecracker.sock ]; then break; fi
+    if [ -S "$SOCK" ]; then break; fi
     sleep 0.2
 done
+
+# Hand the API socket back to the invoking user so vm.sh api works without sudo.
+if [ -S "$SOCK" ] && [ -n "${SUDO_USER:-}" ]; then
+    chown "${SUDO_USER}:${SUDO_USER}" "$SOCK" 2>/dev/null || true
+fi
 
 sleep 10
 

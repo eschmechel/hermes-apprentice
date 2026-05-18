@@ -22,11 +22,31 @@ bash .firecracker/build-rootfs.sh # build rootfs.ext4 from Dockerfile (~5 min fi
 Then to boot:
 
 ```bash
-sudo bash .firecracker/start-vm.sh
-ssh -o StrictHostKeyChecking=accept-new root@10.0.2.2
+bash .firecracker/vm.sh start-ssh    # boots + drops you into an ssh session
+```
+
+or step by step:
+
+```bash
+bash .firecracker/vm.sh start        # boots in the background
+bash .firecracker/vm.sh status       # verify VM + API + sshd
+bash .firecracker/vm.sh ssh          # connect to the guest
 ```
 
 Inside the VM, `hermes --version` should return `Hermes Agent v0.14.0 (2026.5.16)`.
+
+## Lifecycle (`vm.sh`)
+
+| Command | What it does |
+|---|---|
+| `vm.sh start` | Boot the VM in the background (`sudo bash start-vm.sh`) |
+| `vm.sh start-ssh` | Boot, wait for sshd, then `ssh root@10.0.2.2` |
+| `vm.sh status` | Print firecracker PID, API sock state, TAP device state, ssh reachability |
+| `vm.sh stop` | SIGTERM firecracker, escalate to SIGKILL if needed, tear down `fc-tap0` |
+| `vm.sh restart` | `stop` then `start` |
+| `vm.sh logs` | `tail -F /tmp/firecracker.log` |
+| `vm.sh ssh [cmd]` | `ssh root@10.0.2.2 [cmd]` with `StrictHostKeyChecking=accept-new` |
+| `vm.sh api <METHOD> <PATH> [body]` | Raw Firecracker API call over `/tmp/firecracker.sock`. Example: `vm.sh api PUT /actions '{"action_type":"SendCtrlAltDel"}'` |
 
 ## Customization
 
@@ -43,6 +63,7 @@ Inside the VM, `hermes --version` should return `Hermes Agent v0.14.0 (2026.5.16
 | `bootstrap.sh` | Downloads firecracker v1.15.1 and the iximiuz labs Linux kernel v6.18.21 |
 | `build-rootfs.sh` | Builds `rootfs.ext4` from the Dockerfile via `mkfs.ext4 -d` inside a container — no host sudo, no loop devices |
 | `start-vm.sh` | Renders `vm-config.json` from `.tmpl`, sets up TAP/NAT, launches Firecracker |
+| `vm.sh` | Lifecycle wrapper: status / start / start-ssh / stop / restart / logs / ssh / api |
 | `vm-config.json.tmpl` | Firecracker config template with `@REPO_DIR@` placeholder |
 
 `rootfs.ext4`, `firecracker`, and `boot/vmlinux*` are gitignored — recreate them with `bootstrap.sh` and `build-rootfs.sh`.
