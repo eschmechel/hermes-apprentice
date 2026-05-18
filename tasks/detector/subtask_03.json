@@ -1,0 +1,17 @@
+{
+  "id": "detector-03",
+  "seq": "03",
+  "title": "Implement HDBSCAN clustering over recent (7-day) embeddings",
+  "status": "pending",
+  "depends_on": ["01", "02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Clusters embeddings from last 7 days",
+    "With 25 similar inputs, cluster of ≥20 is emitted",
+    "Configurable min_cluster_size and min_samples"
+  ],
+  "deliverables": ["clusterer.go", "HDBSCAN integration"]
+}

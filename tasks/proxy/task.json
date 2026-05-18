@@ -1,0 +1,15 @@
+{
+  "id": "proxy",
+  "name": "Proxy — Intelligent Request Router",
+  "status": "active",
+  "objective": "Go HTTP proxy that sits between Hermes and its model endpoint, routing similar requests to the specialist",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Proxy forwards requests; matching inputs go to specialist",
+    "Fallback works; 5% shadow sampling works"
+  ],
+  "subtask_count": 8,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

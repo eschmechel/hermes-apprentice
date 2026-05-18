@@ -1,0 +1,14 @@
+{
+  "id": "dataset-builder",
+  "name": "Dataset Builder — Training Data Pipeline",
+  "status": "active",
+  "objective": "Python worker that converts a pattern's records into a training-ready dataset with PII redacted and quality-filtered",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Given a pattern ID, produces train/val/test JSONL with PII redacted and quality-filtered"
+  ],
+  "subtask_count": 8,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

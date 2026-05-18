@@ -1,0 +1,14 @@
+{
+  "id": "trainer",
+  "name": "Trainer — Unsloth Fine-Tuning Pipeline",
+  "status": "active",
+  "objective": "Python worker that takes a dataset and runs Unsloth fine-tuning, producing a merged model",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Given a dataset of ~200 pairs on Qwen2.5-1.5B, produces a merged fp16 model in < 30 min"
+  ],
+  "subtask_count": 7,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

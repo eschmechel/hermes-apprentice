@@ -1,0 +1,15 @@
+{
+  "id": "demo",
+  "name": "Demo — Contest Readme, Video, Dev.to Essay & Cross-Posts",
+  "status": "active",
+  "objective": "Contest submission — video, essay, repo README, cross-posts for the Hermes Agent Challenge",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Submitted to dev.to by May 31",
+    "Repo has README with GIF"
+  ],
+  "subtask_count": 6,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

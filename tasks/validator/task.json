@@ -1,0 +1,14 @@
+{
+  "id": "validator",
+  "name": "Validator — Model Evaluation & Promotion Gate",
+  "status": "active",
+  "objective": "Gate that determines whether a trained specialist is good enough to promote",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Given a merged model and held-out test set, produces a pass/fail verdict with metrics"
+  ],
+  "subtask_count": 7,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

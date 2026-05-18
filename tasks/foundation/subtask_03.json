@@ -1,0 +1,16 @@
+{
+  "id": "foundation-03",
+  "seq": "03",
+  "title": "Read Hermes session DB schema from hermes_state.py or docs",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes session DB source"],
+  "acceptance_criteria": [
+    "Document `sessions` and `messages` table schemas",
+    "Column types and relationships identified"
+  ],
+  "deliverables": ["notes/session-db-schema.md"]
+}

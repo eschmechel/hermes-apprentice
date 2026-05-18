@@ -1,0 +1,17 @@
+{
+  "id": "validator-07",
+  "seq": "07",
+  "title": "Expose HTTP endpoint GET /registry/<skill-id>/latest for proxy to query",
+  "status": "pending",
+  "depends_on": ["06"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "GET /registry/<skill-id>/latest returns model path + scores",
+    "Response is valid JSON",
+    "Proxy can query this endpoint to get latest validated model info"
+  ],
+  "deliverables": ["registry_handler.go or registry_handler.py", "HTTP route registration"]
+}

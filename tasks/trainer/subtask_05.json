@@ -1,0 +1,17 @@
+{
+  "id": "trainer-05",
+  "seq": "05",
+  "title": "Implement cloud burst dispatcher: Go side that provisions RunPod pod",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Provisions RunPod pod via runpodctl",
+    "Rsyncs dataset to pod, triggers training, rsyncs model back",
+    "`./apprentice train --mode=burst` provisions pod and returns merged model path"
+  ],
+  "deliverables": ["burst_dispatcher.go", "runpodctl integration", "sync scripts"]
+}

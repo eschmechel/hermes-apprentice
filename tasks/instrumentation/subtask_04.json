@@ -1,0 +1,17 @@
+{
+  "id": "instrumentation-04",
+  "seq": "04",
+  "title": "Emit Prometheus counters if prometheus client library is available",
+  "status": "pending",
+  "depends_on": ["01", "02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "/metrics endpoint exposes relevant counters",
+    "Counters include: requests_total, latency_ms, cost_usd",
+    "Graceful fallback if prometheus library not available"
+  ],
+  "deliverables": ["prometheus_exporter.go", "/metrics route registration"]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "trainer-04",
+  "seq": "04",
+  "title": "Implement merged model output: save_pretrained_merged",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "model.save_pretrained_merged(path, tokenizer, save_method='merged_16bit') works",
+    "Output directory contains config.json, model.safetensors, tokenizer.json"
+  ],
+  "deliverables": ["model_exporter.py", "merged model output directory"]
+}

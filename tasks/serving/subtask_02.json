@@ -1,0 +1,16 @@
+{
+  "id": "serving-02",
+  "seq": "02",
+  "title": "Confirm API shape matches OpenAI spec (Hermes compatibility)",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["OpenAI API spec", "Hermes model provider docs"],
+  "acceptance_criteria": [
+    "API response format matches OpenAI /v1/chat/completions schema",
+    "Hermes profile pointing at this endpoint responds correctly"
+  ],
+  "deliverables": ["compatibility report", "Hermes profile config for vLLM"]
+}

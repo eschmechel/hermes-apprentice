@@ -1,0 +1,14 @@
+{
+  "id": "detector",
+  "name": "Detector — Pattern Discovery via Clustering",
+  "status": "active",
+  "objective": "Go service that clusters recent inputs and emits candidate task patterns when clusters cross threshold",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "With 25 seeded email-extraction inputs, detector emits one candidate pattern above threshold"
+  ],
+  "subtask_count": 6,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

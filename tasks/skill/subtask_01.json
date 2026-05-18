@@ -1,0 +1,17 @@
+{
+  "id": "skill-01",
+  "seq": "01",
+  "title": "Write SKILL.md with name, description, category, and instructions",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": ["Hermes SKILL.md spec"],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Valid YAML frontmatter with name, description, category",
+    "All required fields present",
+    "Instructions describe what the specialist does"
+  ],
+  "deliverables": ["SKILL.md"]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "serving",
+  "name": "Serving — vLLM Inference Layer",
+  "status": "active",
+  "objective": "vLLM serving layer that hosts the specialist model with OpenAI-compatible API",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "vLLM serves a merged model, responds to /v1/chat/completions with correct output"
+  ],
+  "subtask_count": 4,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

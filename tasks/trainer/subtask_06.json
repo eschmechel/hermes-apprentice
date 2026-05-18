@@ -1,0 +1,16 @@
+{
+  "id": "trainer-06",
+  "seq": "06",
+  "title": "Write training_manifest.json with dataset hash, base model, hyperparams, runtime, exit code",
+  "status": "pending",
+  "depends_on": ["04", "05"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Manifest contains dataset_hash, base_model, hyperparameters, runtime_seconds, exit_code",
+    "Manifest is valid JSON"
+  ],
+  "deliverables": ["manifest_writer.py", "training_manifest.json"]
+}

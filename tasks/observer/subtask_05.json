@@ -1,0 +1,17 @@
+{
+  "id": "observer-05",
+  "seq": "05",
+  "title": "Expose HTTP endpoint GET /records for downstream consumers",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Endpoint: GET /records?since=<timestamp>&pattern=<pattern_id>",
+    "`curl` returns JSON array of records",
+    "Pagination or limit support"
+  ],
+  "deliverables": ["records_handler.go", "HTTP route registration"]
+}

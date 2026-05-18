@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-08",
+  "seq": "08",
+  "title": "Save versioned dataset to ~/apprentice/datasets/<pattern-id>/v<n>/ with manifest",
+  "status": "pending",
+  "depends_on": ["07"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Saved to ~/apprentice/datasets/<pattern-id>/v<n>/ directory structure",
+    "Manifest has dataset_hash, row_count, augmentation_count",
+    "SHA-256 hash computed for the dataset"
+  ],
+  "deliverables": ["versioned_saver.py", "dataset manifest.json", "versioned dataset directory"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "proxy-01",
+  "seq": "01",
+  "title": "Go HTTP server with OpenAI-compatible /v1/chat/completions endpoint",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["observer Go scaffold patterns"],
+  "acceptance_criteria": [
+    "Proxy responds with same shape as OpenAI API",
+    "/v1/chat/completions endpoint accepts POST requests",
+    "Response format matches OpenAI spec"
+  ],
+  "deliverables": ["proxy_server.go", "OpenAI-compatible route handler"]
+}

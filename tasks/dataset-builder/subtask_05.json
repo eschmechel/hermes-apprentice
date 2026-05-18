@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-05",
+  "seq": "05",
+  "title": "Implement deduplication: fuzzy dedup on input text",
+  "status": "pending",
+  "depends_on": ["03", "04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Fuzzy dedup using edit distance > 0.85 threshold",
+    "Near-duplicate inputs produce one training row",
+    "Configurable similarity threshold"
+  ],
+  "deliverables": ["deduplicator.py"]
+}

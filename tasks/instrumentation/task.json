@@ -1,0 +1,14 @@
+{
+  "id": "instrumentation",
+  "name": "Instrumentation — Cost & Latency Tracking",
+  "status": "active",
+  "objective": "Cost/latency tracking for demo graphs with Prometheus counters and structured JSON logs",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Prometheus counters or structured JSON logs produce data for latency and cost-over-time graphs"
+  ],
+  "subtask_count": 4,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

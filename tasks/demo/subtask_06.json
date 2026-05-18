@@ -1,0 +1,17 @@
+{
+  "id": "demo-06",
+  "seq": "06",
+  "title": "Submit to dev.to with correct tags and contest form",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "DocWriter",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "dev.to post has `hermes-agent-challenge-2026-05-15` tag",
+    "Correct tags applied",
+    "Contest form submitted"
+  ],
+  "deliverables": ["dev.to published post URL", "contest submission confirmation"]
+}

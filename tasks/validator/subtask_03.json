@@ -1,0 +1,17 @@
+{
+  "id": "validator-03",
+  "seq": "03",
+  "title": "Compute exact-match and F1 scores for specialist and baseline",
+  "status": "pending",
+  "depends_on": ["01", "02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Exact-match score computed for both specialist and baseline",
+    "F1 score computed for both",
+    "Scores are numeric and directly comparable"
+  ],
+  "deliverables": ["metrics_computer.py", "score comparison report"]
+}

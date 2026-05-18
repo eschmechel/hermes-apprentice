@@ -1,0 +1,17 @@
+{
+  "id": "telegram-01",
+  "seq": "01",
+  "title": "Write graduation message template with train/details/skip actions",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["detector pattern output"],
+  "acceptance_criteria": [
+    "Template: 'I've handled N similar requests... Reply `train` to proceed, `details` to see the dataset, `skip`.'",
+    "Message is clear, actionable",
+    "Templates are parameterized with pattern data"
+  ],
+  "deliverables": ["graduation_template.md or .txt"]
+}

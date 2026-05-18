@@ -1,0 +1,16 @@
+{
+  "id": "foundation-02",
+  "seq": "02",
+  "title": "Read skill_manage source — understand create/patch/delete flow",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes skill_manage source"],
+  "acceptance_criteria": [
+    "Document the six actions and payload format",
+    "Understood create/patch/delete flow"
+  ],
+  "deliverables": ["notes/skill_manage-actions.md"]
+}

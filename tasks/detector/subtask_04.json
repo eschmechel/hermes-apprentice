@@ -1,0 +1,17 @@
+{
+  "id": "detector-04",
+  "seq": "04",
+  "title": "Generate pattern description via OpenRouter call when cluster crosses threshold",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Threshold: ≥20 inputs, cosine ≥ 0.78",
+    "Generates description like \"Extract structured fields from customer emails\"",
+    "OpenRouter API call succeeds with prompt built from cluster samples"
+  ],
+  "deliverables": ["pattern_describer.go", "OpenRouter client"]
+}

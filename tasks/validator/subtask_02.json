@@ -1,0 +1,17 @@
+{
+  "id": "validator-02",
+  "seq": "02",
+  "title": "Implement baseline runner: same test set through few-shot prompt on raw Qwen2.5-1.5B",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Runs same test set through raw Qwen2.5-1.5B with few-shot prompt",
+    "Returns comparable (expected, actual) pairs",
+    "Baseline output format matches specialist output format"
+  ],
+  "deliverables": ["baseline_runner.py", "baseline evaluation results"]
+}

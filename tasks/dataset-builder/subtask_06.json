@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-06",
+  "seq": "06",
+  "title": "Implement teacher augmentation: paraphrase inputs via big model for small datasets",
+  "status": "pending",
+  "depends_on": ["05"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "For datasets < 200 pairs, uses big model to paraphrase inputs with preserved output schema",
+    "25 seed pairs become ~200 after augmentation",
+    "Paraphrases preserve the output structure/schema"
+  ],
+  "deliverables": ["augmenter.py", "teacher model client"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "detector-02",
+  "seq": "02",
+  "title": "Implement input hashing and dedup lookup",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["observer records API"],
+  "acceptance_criteria": [
+    "Hash new inputs via SHA-256 or similar",
+    "Skip if same input seen within 24h",
+    "No duplicate embeddings for repeated content"
+  ],
+  "deliverables": ["hasher.go", "dedup_store.go"]
+}

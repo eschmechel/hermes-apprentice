@@ -1,0 +1,17 @@
+{
+  "id": "serving-03",
+  "seq": "03",
+  "title": "Measure and document inference latency on 2080 Ti for merged 1.5B model",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "p50 latency documented (estimate: 60-80ms)",
+    "p99 latency documented",
+    "Measurement methodology documented"
+  ],
+  "deliverables": ["latency-benchmark-results.md", "benchmark script"]
+}

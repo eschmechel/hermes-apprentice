@@ -1,0 +1,17 @@
+{
+  "id": "validator-01",
+  "seq": "01",
+  "title": "Implement test runner: load test JSONL, run through vLLM specialist endpoint",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["serving vLLM endpoint", "dataset-builder test JSONL"],
+  "acceptance_criteria": [
+    "Loads test JSONL dataset",
+    "Runs each input through vLLM specialist /v1/chat/completions",
+    "Returns list of (expected, actual) pairs"
+  ],
+  "deliverables": ["test_runner.py", "specialist evaluation results"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-01",
+  "seq": "01",
+  "title": "Python project scaffold: uv init, dependencies (unsloth, presidio, tokenizers, huggingface-hub)",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "`uv run python -c \"import unsloth\"` succeeds",
+    "All dependencies install without errors",
+    "Project structure follows Python conventions"
+  ],
+  "deliverables": ["pyproject.toml", "uv.lock", "project directory structure"]
+}

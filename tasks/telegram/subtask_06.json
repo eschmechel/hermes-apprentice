@@ -1,0 +1,17 @@
+{
+  "id": "telegram-06",
+  "seq": "06",
+  "title": "Tune message phrasing for natural tone",
+  "status": "pending",
+  "depends_on": ["04", "05"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Self-review: no marketing-speak, no filler",
+    "Tone is natural and conversational",
+    "Messages feel like they come from a system, not a person"
+  ],
+  "deliverables": ["updated templates with refined phrasing"]
+}

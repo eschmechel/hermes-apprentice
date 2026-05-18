@@ -1,0 +1,14 @@
+{
+  "id": "telegram",
+  "name": "Telegram — User-Facing Notifications",
+  "status": "active",
+  "objective": "User-facing notifications for graduation, weekly summary, and failures via Telegram",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Hermes posts graduation message, weekly summary, and failure report to Telegram"
+  ],
+  "subtask_count": 6,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

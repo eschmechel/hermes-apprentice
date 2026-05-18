@@ -1,0 +1,17 @@
+{
+  "id": "validator-05",
+  "seq": "05",
+  "title": "On pass: copy merged model to ~/apprentice/registry/<skill-id>/v<n>/, sign manifest",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Registry has model files + signed manifest",
+    "Directory structure: ~/apprentice/registry/<skill-id>/v<n>/",
+    "Manifest includes scores from promotion gate"
+  ],
+  "deliverables": ["model_registry.py", "registry promotion script", "signed registry manifest"]
+}

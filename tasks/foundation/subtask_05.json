@@ -1,0 +1,16 @@
+{
+  "id": "foundation-05",
+  "seq": "05",
+  "title": "Read Hermes profiles implementation",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes profiles source"],
+  "acceptance_criteria": [
+    "Document profile isolation model",
+    "Understand profile inheritance and overrides"
+  ],
+  "deliverables": ["notes/profiles-implementation.md"]
+}

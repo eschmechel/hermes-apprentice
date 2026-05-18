@@ -1,0 +1,17 @@
+{
+  "id": "serving-04",
+  "seq": "04",
+  "title": "Write systemd unit for auto-start on boot",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "systemd unit file correctly configured",
+    "`systemctl --user enable apprentice-vllm` works",
+    "Service restarts on failure"
+  ],
+  "deliverables": ["apprentice-vllm.service", "enable/install instructions"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "instrumentation-03",
+  "seq": "03",
+  "title": "Write weekly summary generator: read 7-day logs, produce per-pattern report",
+  "status": "pending",
+  "depends_on": ["01", "02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Reads 7-day latency and cost logs",
+    "Produces (volume, avg_latency, total_cost, cost_saved) per pattern",
+    "Summary is valid JSON"
+  ],
+  "deliverables": ["weekly_summary.go", "summary JSON schema"]
+}

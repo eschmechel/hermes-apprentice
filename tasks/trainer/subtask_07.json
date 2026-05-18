@@ -1,0 +1,17 @@
+{
+  "id": "trainer-07",
+  "seq": "07",
+  "title": "Sign manifest with Ed25519 key (generated on first run)",
+  "status": "pending",
+  "depends_on": ["06"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Ed25519 keypair generated on first run, stored at ~/.apprentice/keys/",
+    "manifest.sig verifies against manifest.json",
+    "Signature is deterministic for same input"
+  ],
+  "deliverables": ["manifest_signer.py", "ed25519 keygen", "manifest.sig"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "telegram-04",
+  "seq": "04",
+  "title": "Wire templates into Hermes cron-aware Telegram delivery",
+  "status": "pending",
+  "depends_on": ["01", "02", "03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes Telegram integration docs"],
+  "acceptance_criteria": [
+    "Messages appear in configured Telegram channel",
+    "Delivery uses Hermes cron mechanism",
+    "All three template types are wired"
+  ],
+  "deliverables": ["telegram_delivery.go or .py", "delivery integration code"]
+}

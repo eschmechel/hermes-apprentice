@@ -1,0 +1,18 @@
+{
+  "id": "demo-02",
+  "seq": "02",
+  "title": "Record demo video (3 min): Telegram interactions → graduation → latency graph",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "3 minutes duration",
+    "Clean audio",
+    "Shows Telegram interactions leading to graduation moment",
+    "Side-by-side latency graph comparison"
+  ],
+  "deliverables": ["demo-video.mp4 or link to hosted video"]
+}

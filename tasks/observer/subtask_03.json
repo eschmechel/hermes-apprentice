@@ -1,0 +1,16 @@
+{
+  "id": "observer-03",
+  "seq": "03",
+  "title": "Deduplicate and normalize records",
+  "status": "pending",
+  "depends_on": ["02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Same content + same session within 60s = skip",
+    "Idempotent on restart — no duplicate records after restart"
+  ],
+  "deliverables": ["dedup.go", "normalizer.go"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "trainer-02",
+  "seq": "02",
+  "title": "Add hyperparameter profile for 2080 Ti (11GB VRAM)",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Batch size 2-4, gradient accumulation 2-4, QLoRA only",
+    "Training completes without OOM on 11GB 2080 Ti",
+    "Profile is configurable via CLI or config file"
+  ],
+  "deliverables": ["profile_2080ti.yaml", "profile loader integration"]
+}

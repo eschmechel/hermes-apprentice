@@ -1,0 +1,16 @@
+{
+  "id": "foundation-04",
+  "seq": "04",
+  "title": "Read cron tick implementation — no_agent mode, script resolution",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes cron tick source"],
+  "acceptance_criteria": [
+    "Document tick flow and no_agent mode",
+    "Document script resolution mechanism"
+  ],
+  "deliverables": ["notes/cron-tick-implementation.md"]
+}

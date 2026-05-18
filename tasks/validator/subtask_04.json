@@ -1,0 +1,17 @@
+{
+  "id": "validator-04",
+  "seq": "04",
+  "title": "Implement promotion gate: specialist ≥ baseline + 10 AND specialist ≥ teacher - 5",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Specialist ≥ baseline + 10 AND specialist ≥ teacher - 5",
+    "Boolean pass/fail with per-metric breakdown",
+    "Output includes all component scores"
+  ],
+  "deliverables": ["promotion_gate.py", "gate verdict output"]
+}

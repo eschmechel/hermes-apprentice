@@ -1,0 +1,21 @@
+{
+  "id": "observer-01",
+  "seq": "01",
+  "title": "Go project scaffold: go mod init, cobra CLI, SQLite driver, basic HTTP server",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["foundation session DB schema notes"],
+  "acceptance_criteria": [
+    "Binary compiles without errors",
+    "`--help` flag works with command descriptions"
+  ],
+  "deliverables": [
+    "go.mod",
+    "main.go",
+    "CLI structure with cobra",
+    "basic HTTP server scaffold"
+  ]
+}

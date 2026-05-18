@@ -1,0 +1,8 @@
+.firecracker/
+.opencode/node_modules/
+.tmp/
+.venv/
+.env
+.DS_Store
+*.pyc
+__pycache__/

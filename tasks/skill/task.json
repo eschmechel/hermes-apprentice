@@ -1,0 +1,14 @@
+{
+  "id": "skill",
+  "name": "Skill — Hermes Specialist SKILL.md",
+  "status": "active",
+  "objective": "Hermes SKILL.md that describes the specialist, making it visible in Hermes' skill ecosystem",
+  "context_files": [],
+  "reference_files": [],
+  "exit_criteria": [
+    "Skill appears in skills_list, agent loads it for matching requests"
+  ],
+  "subtask_count": 5,
+  "completed_count": 0,
+  "created_at": "2026-05-17T10:00:00.000Z"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "observer-04",
+  "seq": "04",
+  "title": "Write normalized records to local SQLite store",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Schema includes: pattern_id, input_hash, input_text, output_text, system_prompt_hash, model_used, latency_ms, token_counts",
+    "Records survive restart",
+    "Queryable by pattern_id"
+  ],
+  "deliverables": ["store.go", "SQLite schema migration"]
+}

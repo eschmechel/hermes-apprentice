@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-02",
+  "seq": "02",
+  "title": "Implement record fetcher: pull records from Observer API for a pattern ID",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["observer /records endpoint"],
+  "acceptance_criteria": [
+    "Fetches records from Observer HTTP API for a given pattern_id",
+    "Returns list of (input, output) pairs",
+    "Handles pagination and errors gracefully"
+  ],
+  "deliverables": ["record_fetcher.py", "Observer API client"]
+}

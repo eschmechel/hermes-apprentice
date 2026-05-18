@@ -1,0 +1,17 @@
+{
+  "id": "detector-01",
+  "seq": "01",
+  "title": "Integrate BGE-small embedding model via ONNX runtime",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["observer records API"],
+  "acceptance_criteria": [
+    "`embed(\"extract name from this email\")` returns a float vector",
+    "ONNX runtime loads model successfully",
+    "Inference returns consistent dimensions"
+  ],
+  "deliverables": ["embedder.go", "ONNX model loader", "BGE-small model artifact"]
+}

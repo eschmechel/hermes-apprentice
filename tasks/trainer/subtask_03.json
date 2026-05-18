@@ -1,0 +1,17 @@
+{
+  "id": "trainer-03",
+  "seq": "03",
+  "title": "Add hyperparameter profile for RunPod A100 (80GB VRAM)",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Batch size 16-32, LoRA 16-bit, no quantization",
+    "Training completes in < 10 min on A100",
+    "Profile is configurable via CLI or config file"
+  ],
+  "deliverables": ["profile_a100.yaml", "profile loader integration"]
+}

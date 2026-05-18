@@ -1,0 +1,18 @@
+{
+  "id": "demo-03",
+  "seq": "03",
+  "title": "Write dev.to essay (~2500 words): cold open → architecture → numbers → close",
+  "status": "pending",
+  "depends_on": ["01", "02"],
+  "parallel": false,
+  "suggested_agent": "DocWriter",
+  "context_files": [],
+  "reference_files": ["README.md", "architecture diagram", "demo video"],
+  "acceptance_criteria": [
+    "~2500 words",
+    "Structure: cold open → Hermes background → skill-as-weights → architecture → numbers → failures → close",
+    "Fits the Write About Hermes Agent track",
+    "Includes all key project details and learnings"
+  ],
+  "deliverables": ["devto-essay.md"]
+}

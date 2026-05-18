@@ -1,0 +1,19 @@
+{
+  "id": "demo-05",
+  "seq": "05",
+  "title": "Cross-post to lobste.rs, HN, Nous Discord, r/LocalLLaMA",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": true,
+  "suggested_agent": "DocWriter",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Links posted to lobste.rs",
+    "Links posted to Hacker News",
+    "Links posted to Nous Discord",
+    "Links posted to r/LocalLLaMA",
+    "Engagement monitored"
+  ],
+  "deliverables": ["cross-post URLs and screenshots"]
+}

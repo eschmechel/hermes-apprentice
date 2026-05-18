@@ -1,0 +1,16 @@
+{
+  "id": "detector-05",
+  "seq": "05",
+  "title": "Store candidate pattern as ~/apprentice/patterns/<id>/manifest.json",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Manifest includes centroid embedding, description, record count",
+    "Pattern survives restart (persisted to disk)"
+  ],
+  "deliverables": ["pattern_store.go", "manifest schema", "manifest.json example"]
+}

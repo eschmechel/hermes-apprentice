@@ -1,0 +1,17 @@
+{
+  "id": "validator-06",
+  "seq": "06",
+  "title": "On fail: write failure report with scores, dataset info, suggested action",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Failure report written to ~/apprentice/failures/<run-id>.json",
+    "Report contains scores, dataset info, suggested action",
+    "User is notified via Telegram (integrate with telegram feature)"
+  ],
+  "deliverables": ["failure_reporter.py", "failure report JSON example"]
+}

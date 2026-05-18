@@ -1,0 +1,18 @@
+{
+  "id": "trainer-01",
+  "seq": "01",
+  "title": "Implement Unsloth training script: load Qwen2.5-1.5B-Instruct 4-bit, LoRA rank 16",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Loads Qwen2.5-1.5B-Instruct in 4-bit quantization",
+    "LoRA rank 16 configured",
+    "Trains on JSONL dataset format",
+    "Training runs without error on 25 test pairs"
+  ],
+  "deliverables": ["train.py", "Unsloth training script with LoRA config"]
+}

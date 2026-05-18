@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-07",
+  "seq": "07",
+  "title": "Split 80/10/10 and serialize train/val/test JSONL with Hermes chat template format",
+  "status": "pending",
+  "depends_on": ["06"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["Hermes chat template format docs"],
+  "acceptance_criteria": [
+    "Split ratio: 80% train, 10% val, 10% test",
+    "Files are valid JSONL with role/content structure",
+    "Hermes chat template format followed correctly"
+  ],
+  "deliverables": ["splitter.py", "train.jsonl", "val.jsonl", "test.jsonl"]
+}

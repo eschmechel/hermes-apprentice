@@ -1,0 +1,16 @@
+{
+  "id": "skill-04",
+  "seq": "04",
+  "title": "Register skill automatically from Validator: copy SKILL.md to ~/.hermes/skills/<id>/",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["validator promotion output"],
+  "acceptance_criteria": [
+    "After promotion, skill appears in ~/.hermes/skills/<id>/",
+    "SKILL.md is valid and loadable by Hermes"
+  ],
+  "deliverables": ["skill_registrar.py or .sh", "auto-registration integration with validator"]
+}

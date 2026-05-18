@@ -1,0 +1,17 @@
+{
+  "id": "demo-04",
+  "seq": "04",
+  "title": "Set up eschmechel.dev mirror with canonical URL back to dev.to",
+  "status": "pending",
+  "depends_on": ["03"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "eschmechel.dev hosts the essay",
+    "Canonical tag points to dev.to",
+    "SEO metadata correct"
+  ],
+  "deliverables": ["eschmechel.dev page", "canonical URL config"]
+}

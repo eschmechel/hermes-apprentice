@@ -1,0 +1,16 @@
+{
+  "id": "foundation-07",
+  "seq": "07",
+  "title": "Write no_agent cron job that runs shell wrapper and delivers to Telegram",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Cron fires every N minutes",
+    "Output appears in Telegram channel"
+  ],
+  "deliverables": ["cron job script", "Telegram delivery proof"]
+}

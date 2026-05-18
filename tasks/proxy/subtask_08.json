@@ -1,0 +1,16 @@
+{
+  "id": "proxy-08",
+  "seq": "08",
+  "title": "Configure Hermes profile to point at proxy as model provider",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "`hermes model` set to proxy URL",
+    "Chat works through proxy end-to-end"
+  ],
+  "deliverables": ["Hermes profile config for proxy", "end-to-end connectivity test"]
+}

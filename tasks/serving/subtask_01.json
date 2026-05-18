@@ -1,0 +1,17 @@
+{
+  "id": "serving-01",
+  "seq": "01",
+  "title": "Install vLLM, stand up server with merged Qwen2.5-1.5B",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "vLLM installed and server starts without errors",
+    "`vllm serve <path> --port 8000` launches successfully",
+    "`curl localhost:8000/v1/chat/completions` returns valid response"
+  ],
+  "deliverables": ["vLLM server config", "launch script", "smoke test proof"]
+}

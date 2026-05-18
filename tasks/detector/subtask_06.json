@@ -1,0 +1,17 @@
+{
+  "id": "detector-06",
+  "seq": "06",
+  "title": "Expose HTTP endpoints GET /patterns and POST /patterns/:id/approve",
+  "status": "pending",
+  "depends_on": ["05"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "`GET /patterns` returns JSON list of candidate patterns",
+    "`POST /patterns/:id/approve` marks pattern as approved",
+    "`curl` commands work for both endpoints"
+  ],
+  "deliverables": ["patterns_handler.go", "approve_handler.go", "HTTP route registration"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "foundation-06",
+  "seq": "06",
+  "title": "Write throwaway skill that calls terminal tool with a simple script",
+  "status": "pending",
+  "depends_on": ["02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Skill registered via skill_manage",
+    "Agent invokes it and returns output",
+    "Skill can be deleted after test"
+  ],
+  "deliverables": ["throwaway SKILL.md", "skill_manage registration proof"]
+}

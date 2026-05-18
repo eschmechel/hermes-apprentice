@@ -1,0 +1,17 @@
+{
+  "id": "instrumentation-02",
+  "seq": "02",
+  "title": "Add cost tracking: per-request cost from OpenRouter token pricing",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": true,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["proxy source code", "OpenRouter pricing docs"],
+  "acceptance_criteria": [
+    "Log line has {estimated_cost_usd}",
+    "Cost computed from token count × OpenRouter pricing",
+    "Separate tracking for specialist (local = free) vs upstream (paid)"
+  ],
+  "deliverables": ["cost_tracker.go", "pricing config"]
+}

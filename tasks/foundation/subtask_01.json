@@ -1,0 +1,16 @@
+{
+  "id": "foundation-01",
+  "seq": "01",
+  "title": "Install Hermes v0.13.0, verify CLI works",
+  "status": "pending",
+  "depends_on": [],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "`hermes --version` returns v0.13.0",
+    "Hermes CLI is callable from PATH"
+  ],
+  "deliverables": ["hermes v0.13.0 installation"]
+}

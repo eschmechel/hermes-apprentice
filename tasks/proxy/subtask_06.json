@@ -1,0 +1,18 @@
+{
+  "id": "proxy-06",
+  "seq": "06",
+  "title": "Implement 5% shadow sampling: send to BOTH specialist and upstream, log comparison",
+  "status": "pending",
+  "depends_on": ["04"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Randomly samples ~5% of matching requests",
+    "Sends to BOTH specialist and upstream",
+    "Log file has (input, specialist_output, upstream_output, latency_both)",
+    "Client receives specialist response (shadow is silent)"
+  ],
+  "deliverables": ["shadow_sampler.go", "shadow comparison log"]
+}

@@ -1,0 +1,17 @@
+{
+  "id": "dataset-builder-04",
+  "seq": "04",
+  "title": "Implement quality filter: drop pairs where user re-asked or corrected within 3 turns",
+  "status": "pending",
+  "depends_on": ["02"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": [],
+  "acceptance_criteria": [
+    "Drops pairs where user corrected or re-asked within 3 conversation turns",
+    "Only 'accepted' outputs survive filtering",
+    "Configurable filtering rules"
+  ],
+  "deliverables": ["quality_filter.py"]
+}

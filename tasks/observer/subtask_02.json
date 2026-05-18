@@ -1,0 +1,17 @@
+{
+  "id": "observer-02",
+  "seq": "02",
+  "title": "Implement session DB polling: read messages table on timer",
+  "status": "pending",
+  "depends_on": ["01"],
+  "parallel": false,
+  "suggested_agent": "CoderAgent",
+  "context_files": [],
+  "reference_files": ["foundation/session-db-schema.md"],
+  "acceptance_criteria": [
+    "Service polls messages table on configurable timer",
+    "Extracts (session_id, role, content, timestamp, tool_calls) from new rows",
+    "Service logs new messages as they appear in Hermes DB"
+  ],
+  "deliverables": ["poller.go", "Hermes DB reader integration"]
+}
