@@ -2,7 +2,7 @@
   "id": "foundation-01",
   "seq": "01",
   "title": "Install Hermes v0.13.0, verify CLI works",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -12,5 +12,9 @@
     "`hermes --version` returns v0.13.0",
     "Hermes CLI is callable from PATH"
   ],
-  "deliverables": ["hermes v0.13.0 installation"]
+  "deliverables": [
+    "hermes v0.13.0 installation"
+  ],
+  "completed_at": "2026-05-18T02:57:29.032Z",
+  "completion_summary": "Installed Hermes v0.14.0 in Firecracker microVM with PCIe-enabled kernel, verified hermes doctor and skills dir"
 }

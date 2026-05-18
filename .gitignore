@@ -1,4 +1,6 @@
-.firecracker/
+.firecracker/*
+!.firecracker/Dockerfile
+!.firecracker/vm-config.json
 .opencode/node_modules/
 .tmp/
 .venv/
