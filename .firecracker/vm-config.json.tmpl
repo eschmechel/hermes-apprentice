@@ -1,12 +1,12 @@
 {
   "boot-source": {
-    "kernel_image_path": "/mnt/GOONDRIVE/Repos/hermes-apprentice/.firecracker/boot/vmlinux",
+    "kernel_image_path": "@REPO_DIR@/.firecracker/boot/vmlinux",
     "boot_args": "console=ttyS0 reboot=k panic=1"
   },
   "drives": [
     {
       "drive_id": "rootfs",
-      "path_on_host": "/mnt/GOONDRIVE/Repos/hermes-apprentice/.firecracker/rootfs.ext4",
+      "path_on_host": "@REPO_DIR@/.firecracker/rootfs.ext4",
       "is_root_device": true,
       "is_read_only": false
     }

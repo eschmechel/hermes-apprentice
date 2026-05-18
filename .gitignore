@@ -1,9 +1,11 @@
 .firecracker/*
 !.firecracker/Dockerfile
-!.firecracker/vm-config.json
+!.firecracker/vm-config.json.tmpl
 !.firecracker/start-vm.sh
 !.firecracker/build-rootfs.sh
+!.firecracker/bootstrap.sh
 !.firecracker/.dockerignore
+!.firecracker/README.md
 .opencode/node_modules/
 .tmp/
 .venv/
