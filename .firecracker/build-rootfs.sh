@@ -10,9 +10,19 @@ EXT4_SIZE_MB=4096
 EXT4_PATH="${FC_DIR}/rootfs.ext4"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
+SSH_PUBKEY_PATH="${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}"
+
+if [ ! -f "$SSH_PUBKEY_PATH" ]; then
+    echo "ERROR: SSH public key not found at $SSH_PUBKEY_PATH"
+    echo "Set SSH_PUBKEY_PATH=/path/to/key.pub or generate one with: ssh-keygen -t ed25519"
+    exit 1
+fi
+SSH_AUTHORIZED_KEY="$(cat "$SSH_PUBKEY_PATH")"
+echo "Using SSH pubkey: $SSH_PUBKEY_PATH"
 
 echo "=== 1/3: Building Docker image ${IMAGE_TAG} ==="
-docker build -t "$IMAGE_TAG" -f "${FC_DIR}/Dockerfile" "${FC_DIR}"
+docker build --build-arg "SSH_AUTHORIZED_KEY=${SSH_AUTHORIZED_KEY}" \
+    -t "$IMAGE_TAG" -f "${FC_DIR}/Dockerfile" "${FC_DIR}"
 
 echo "=== 2/3: Pre-allocating ${EXT4_SIZE_MB} MiB ext4 file ==="
 rm -f "$EXT4_PATH"

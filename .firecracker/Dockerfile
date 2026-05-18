@@ -2,8 +2,10 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl git ca-certificates python3 python3-pip nodejs npm ripgrep \
-    iproute2 iputils-ping procps \
+    iproute2 iputils-ping procps openssh-server \
     && rm -rf /var/lib/apt/lists/*
+
+RUN ssh-keygen -A
 
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
@@ -15,9 +17,15 @@ RUN /usr/local/bin/hermes --version
 
 RUN mkdir -p /root/.hermes/skills
 
+ARG SSH_AUTHORIZED_KEY=""
+RUN mkdir -p /root/.ssh \
+    && printf '%s\n' "$SSH_AUTHORIZED_KEY" > /root/.ssh/authorized_keys \
+    && chmod 0700 /root/.ssh \
+    && chmod 0600 /root/.ssh/authorized_keys
+
 RUN printf '%s\n' \
     '#!/bin/sh' \
-    'mkdir -p /proc /sys /dev/pts /tmp /run' \
+    'mkdir -p /proc /sys /dev/pts /tmp /run /run/sshd' \
     'mount -t proc proc /proc' \
     'mount -t devpts devpts /dev/pts' \
     'mount -t sysfs sysfs /sys' \
@@ -28,6 +36,7 @@ RUN printf '%s\n' \
     'echo "[init] network up: eth0 10.0.2.2/24 via 10.0.2.1"' \
     'echo "[init] hermes version:"' \
     '/usr/local/bin/hermes --version || echo "[init] hermes --version FAILED"' \
+    '/usr/sbin/sshd && echo "[init] sshd started; ssh root@10.0.2.2 from host"' \
     'exec /bin/bash -l' \
     > /etc/init.sh \
     && chmod 0755 /etc/init.sh \
