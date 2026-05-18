@@ -1,7 +1,7 @@
 {
   "id": "foundation-01",
   "seq": "01",
-  "title": "Install Hermes v0.13.0, verify CLI works",
+  "title": "Install Hermes v0.14.0 in Firecracker microVM, verify CLI works",
   "status": "completed",
   "depends_on": [],
   "parallel": false,
@@ -9,11 +9,11 @@
   "context_files": [],
   "reference_files": [],
   "acceptance_criteria": [
-    "`hermes --version` returns v0.13.0",
-    "Hermes CLI is callable from PATH"
+    "`hermes --version` returns v0.14.0 (release tag v2026.5.16)",
+    "Hermes CLI is callable from PATH inside the Firecracker guest"
   ],
   "deliverables": [
-    "hermes v0.13.0 installation"
+    "hermes v0.14.0 installation inside .firecracker/rootfs.ext4"
   ],
   "completed_at": "2026-05-18T02:57:29.032Z",
   "completion_summary": "Installed Hermes v0.14.0 in Firecracker microVM with PCIe-enabled kernel, verified hermes doctor and skills dir"

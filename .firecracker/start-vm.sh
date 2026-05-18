@@ -1,0 +1,79 @@
+#!/bin/bash
+set -e
+
+FC_DIR="$(cd "$(dirname "$0")" && pwd)"
+FIRECRACKER="${FC_DIR}/firecracker"
+CONFIG="${FC_DIR}/vm-config.json"
+TAP_DEV="fc-tap0"
+TAP_IP="10.0.2.1"
+GUEST_IP="10.0.2.2"
+GUEST_MAC="06:00:00:00:00:01"
+NAT_SUBNET="10.0.2.0/24"
+
+echo "=== Firecracker VM Startup ==="
+
+if [ ! -f "$FIRECRACKER" ]; then
+    echo "ERROR: Firecracker binary not found at $FIRECRACKER"
+    exit 1
+fi
+
+echo "Killing any stale Firecracker processes (they hold TAP fds)..."
+sudo pkill -KILL -f "$FIRECRACKER" 2>/dev/null || true
+pkill -KILL -f "$FIRECRACKER" 2>/dev/null || true
+rm -f /tmp/firecracker.sock
+
+echo "Setting up TAP device..."
+if ip link show "$TAP_DEV" &>/dev/null; then
+    echo "Cleaning up existing TAP device $TAP_DEV..."
+    sudo ip link set "$TAP_DEV" down 2>/dev/null || true
+    sudo ip tuntap del dev "$TAP_DEV" mode tap 2>/dev/null || true
+fi
+# Wait for the kernel to actually release the device
+for i in 1 2 3 4 5; do
+    if ! ip link show "$TAP_DEV" &>/dev/null; then break; fi
+    echo "  device still present, waiting ($i/5)..."
+    sleep 1
+done
+if ip link show "$TAP_DEV" &>/dev/null; then
+    echo "ERROR: $TAP_DEV still present after delete. Manually check:"
+    echo "  lsof /dev/net/tun"
+    echo "  pgrep -af firecracker"
+    exit 1
+fi
+echo "Creating TAP device $TAP_DEV..."
+sudo ip tuntap add dev "$TAP_DEV" mode tap
+sudo ip addr add "${TAP_IP}/24" dev "$TAP_DEV"
+sudo ip link set "$TAP_DEV" up
+
+echo "Configuring NAT..."
+sudo sysctl -w net.ipv4.ip_forward=1
+sudo iptables -t nat -C POSTROUTING -s "$NAT_SUBNET" ! -o "$TAP_DEV" -j MASQUERADE 2>/dev/null || \
+    sudo iptables -t nat -A POSTROUTING -s "$NAT_SUBNET" ! -o "$TAP_DEV" -j MASQUERADE
+
+echo "Starting Firecracker VM..."
+rm -f /tmp/firecracker.log
+"$FIRECRACKER" \
+    --api-sock /tmp/firecracker.sock \
+    --config-file "$CONFIG" \
+    > /tmp/firecracker.log 2>&1 &
+
+FC_PID=$!
+echo "Firecracker PID: $FC_PID"
+
+for i in {1..30}; do
+    if [ -S /tmp/firecracker.sock ]; then break; fi
+    sleep 0.2
+done
+
+sleep 10
+
+if kill -0 $FC_PID 2>/dev/null; then
+    echo "=== VM IS RUNNING ==="
+    echo "=== Console output: ==="
+    cat /tmp/firecracker.log
+    echo "=== End ==="
+else
+    echo "ERROR: VM failed to start"
+    cat /tmp/firecracker.log
+    exit 1
+fi
