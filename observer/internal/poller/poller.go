@@ -125,19 +125,23 @@ ORDER BY id ASC`
 		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Content, &m.Timestamp, &m.ToolCalls, &m.ToolName); err != nil {
 			return count, high, fmt.Errorf("scan: %w", err)
 		}
-		p.logger.Info("hermes message",
-			"id", m.ID,
-			"session_id", m.SessionID,
-			"role", m.Role,
-			"content_len", contentLen(m.Content),
-			"tool_calls_len", contentLen(m.ToolCalls),
-			"tool_name", nullStr(m.ToolName),
-			"ts", m.Timestamp,
-		)
 		if p.cfg.Handler != nil {
 			if err := p.cfg.Handler(ctx, m); err != nil {
+				// Don't advance past the failed message — the handler can
+				// retry it on the next tick.
 				return count, high, fmt.Errorf("handler: %w", err)
 			}
+		} else {
+			// No handler wired (e.g. early scaffold testing): log raw to make
+			// the poller visibly useful on its own.
+			p.logger.Info("hermes message (no handler)",
+				"id", m.ID,
+				"session_id", m.SessionID,
+				"role", m.Role,
+				"content_len", contentLen(m.Content),
+				"tool_calls_len", contentLen(m.ToolCalls),
+				"ts", m.Timestamp,
+			)
 		}
 		count++
 		high = m.ID

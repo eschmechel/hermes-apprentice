@@ -6,21 +6,26 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
+	"github.com/hermes-apprentice/observer/internal/dedup"
 	"github.com/hermes-apprentice/observer/internal/httpapi"
+	"github.com/hermes-apprentice/observer/internal/normalizer"
 	"github.com/hermes-apprentice/observer/internal/poller"
+	"github.com/hermes-apprentice/observer/internal/state"
 	"github.com/spf13/cobra"
 )
 
 func serveCmd() *cobra.Command {
 	var (
-		listenAddr      string
-		hermesDBPath    string
-		observerDB      string
-		pollInterval    time.Duration
-		fromBeginning   bool
+		listenAddr    string
+		hermesDBPath  string
+		observerDB    string
+		pollInterval  time.Duration
+		fromBeginning bool
+		dedupWindow   time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -33,22 +38,60 @@ func serveCmd() *cobra.Command {
 				"hermes_db", hermesDBPath,
 				"observer_db", observerDB,
 				"poll_interval", pollInterval,
+				"dedup_window", dedupWindow,
 				"version", Version,
 			)
 
 			ctx, stop := signal.NotifyContext(c.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
+			// Persistent high-water mark lives next to observerDB so a restart
+			// resumes from the last fully-processed messages.id.
+			hwm, err := state.Load(filepath.Dir(observerDB))
+			if err != nil {
+				return fmt.Errorf("load hwm: %w", err)
+			}
+			logger.Info("hwm loaded", "last_processed_id", hwm.Get(), "path", filepath.Join(filepath.Dir(observerDB), "observer.state.json"))
+
+			window := dedup.New(dedupWindow, nil)
+
 			srv := httpapi.New(httpapi.Config{
 				Addr:   listenAddr,
 				Logger: logger,
 			})
 
+			handler := func(ctx context.Context, m poller.Message) error {
+				n := normalizer.Normalize(m)
+				if window.Seen(n.SessionID, n.ContentHash) {
+					logger.Debug("dedup drop",
+						"id", n.ID,
+						"session_id", n.SessionID,
+						"role", n.Role,
+						"content_hash", n.ContentHash[:12],
+					)
+					// Still advance HWM — we observed this message, just chose to drop it.
+					return hwm.Set(m.ID)
+				}
+				logger.Info("hermes message",
+					"id", n.ID,
+					"session_id", n.SessionID,
+					"role", n.Role,
+					"content_len", len(n.Content),
+					"tool_calls_len", len(n.ToolCalls),
+					"content_hash", n.ContentHash[:12],
+					"ts", n.Timestamp,
+				)
+				// TODO observer-04: persist normalized record to the local SQLite store.
+				return hwm.Set(m.ID)
+			}
+
 			poll := poller.New(poller.Config{
 				HermesDBPath:       hermesDBPath,
 				Interval:           pollInterval,
 				Logger:             logger.With("component", "poller"),
+				Handler:            handler,
 				StartFromBeginning: fromBeginning,
+				StartFromID:        hwm.Get(),
 			})
 
 			httpErr := make(chan error, 1)
@@ -80,5 +123,6 @@ func serveCmd() *cobra.Command {
 	cmd.Flags().StringVar(&observerDB, "observer-db", "/root/.apprentice/observer.db", "Path to the observer's own SQLite store")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", time.Second, "How often to poll the Hermes DB for new messages")
 	cmd.Flags().BoolVar(&fromBeginning, "from-beginning", false, "Replay every existing message in the Hermes DB instead of only streaming new ones (off by default)")
+	cmd.Flags().DurationVar(&dedupWindow, "dedup-window", 60*time.Second, "Rolling window in which (session_id, content_hash) duplicates are dropped")
 	return cmd
 }
