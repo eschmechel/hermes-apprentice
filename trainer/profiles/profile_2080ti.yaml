@@ -1,0 +1,22 @@
+# 2080 Ti hyperparameter profile -- 11 GB VRAM, Turing arch (no bf16, fp16 only).
+#
+# Tuned to keep peak VRAM under 10 GB while leaving headroom for the activation
+# checkpoints Unsloth keeps. Batch 2 + grad-accum 4 -> effective batch 8.
+#
+# Per the trainer-02 acceptance: batch_size 2-4, grad_accum 2-4, QLoRA only,
+# training completes without OOM on 11GB.
+
+base_model: "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit"
+load_in_4bit: true
+max_seq_len: 2048
+lora_rank: 16
+
+batch_size: 2
+grad_accum: 4
+
+# Standard QLoRA hyperparameters for Qwen2.5-1.5B.
+learning_rate: 0.0002
+warmup_steps: 5
+max_steps: 60
+
+seed: 3407

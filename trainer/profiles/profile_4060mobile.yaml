@@ -1,0 +1,26 @@
+# RTX 4060 Mobile / Max-Q hyperparameter profile (laptop dev target).
+#
+# Ada Lovelace arch supports bf16. VRAM is 6-8 GB depending on SKU, so we're
+# tighter than the 2080 Ti: batch 1 with grad-accum 8 keeps activation memory
+# down while preserving effective batch 8.
+#
+# Use this for local smoke runs before paying for RunPod time. NOT for a final
+# training run -- the laptop's thermal envelope will throttle on a long-duration
+# job.
+
+base_model: "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit"
+load_in_4bit: true
+
+# Cut max_seq_len to keep peak activation memory under control on 6 GB SKUs.
+# Bump to 2048 if you have the 8 GB variant.
+max_seq_len: 1024
+lora_rank: 16
+
+batch_size: 1
+grad_accum: 8
+
+learning_rate: 0.0002
+warmup_steps: 5
+max_steps: 30
+
+seed: 3407

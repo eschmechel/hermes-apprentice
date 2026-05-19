@@ -30,6 +30,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 LOG = logging.getLogger("apprentice_trainer")
 
 # logging.LogRecord built-in attrs we never want in the JSON payload (Python
@@ -160,12 +162,15 @@ def run_training(args: argparse.Namespace) -> int:
         return 4
 
     # ---- model -----------------------------------------------------------
-    LOG.info("loading base model in 4-bit", extra={"base_model": args.base_model})
+    LOG.info(
+        "loading base model",
+        extra={"base_model": args.base_model, "load_in_4bit": args.load_in_4bit},
+    )
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=args.base_model,
         max_seq_length=args.max_seq_len,
         dtype=None,  # let Unsloth pick (bf16 on Ampere+, fp16 otherwise)
-        load_in_4bit=True,
+        load_in_4bit=args.load_in_4bit,
     )
 
     # Qwen2.5 uses ChatML; Unsloth's preset names this template "qwen-2.5".
@@ -269,8 +274,16 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Path to a versioned dataset dir (contains train.jsonl.gz, val.jsonl.gz).")
     p.add_argument("--output-dir", required=True,
                    help="Where to write the LoRA adapter + training checkpoints.")
+    p.add_argument("--profile", default=None,
+                   help="YAML profile whose keys override built-in defaults. "
+                        "Profile keys correspond to long-option dest names "
+                        "(e.g. base_model, batch_size). Explicit CLI flags still win.")
     p.add_argument("--base-model", default="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
                    help="HF model id; defaults to the Unsloth-prequantized Qwen2.5-1.5B.")
+    p.add_argument("--load-in-4bit", action=argparse.BooleanOptionalAction, default=True,
+                   help="Whether to bnb-4bit-quantize the base model (default True). "
+                        "Set --no-load-in-4bit on big-VRAM machines (A100, H100) where "
+                        "16-bit LoRA on the unquantized base trains faster.")
     p.add_argument("--max-seq-len", type=int, default=2048)
     p.add_argument("--lora-rank", type=int, default=16, help="LoRA rank r (acceptance: 16).")
     p.add_argument("--max-steps", type=int, default=60)
@@ -283,6 +296,36 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Parse args + load dataset + validate config, then exit without training.")
     p.add_argument("-v", "--verbose", action="store_true")
     return p
+
+
+def load_profile(path: str | os.PathLike) -> dict[str, Any]:
+    """Load a YAML profile file. Returns a dict of argparse-dest -> value.
+
+    Unknown keys are kept in the dict (caller can validate against the parser's
+    actions). Missing file raises FileNotFoundError; bad YAML raises a
+    yaml.YAMLError with the path-prefixed message.
+    """
+    p = Path(path).expanduser().resolve()
+    with open(p, "r", encoding="utf-8") as f:
+        try:
+            data = yaml.safe_load(f) or {}
+        except yaml.YAMLError as e:
+            raise yaml.YAMLError(f"{p}: {e}") from e
+    if not isinstance(data, dict):
+        raise ValueError(f"{p}: top-level YAML must be a mapping, got {type(data).__name__}")
+    return data
+
+
+def _apply_profile(parser: argparse.ArgumentParser, profile: dict[str, Any]) -> list[str]:
+    """Set profile values as parser defaults so CLI flags still override.
+
+    Returns a list of profile keys that didn't match any parser dest (warnings,
+    not fatal — profiles can carry extra metadata like `comment`).
+    """
+    known_dests = {action.dest for action in parser._actions}
+    accepted = {k: v for k, v in profile.items() if k in known_dests}
+    parser.set_defaults(**accepted)
+    return [k for k in profile if k not in known_dests]
 
 
 def check_only(args: argparse.Namespace) -> int:
@@ -310,8 +353,20 @@ def check_only(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    # Two-pass: first peek at --profile so we can layer its values BENEATH any
+    # explicit CLI overrides via set_defaults(). argparse then resolves CLI
+    # flags on top normally, giving precedence: CLI > profile > built-in default.
+    prelim, _unknown = parser.parse_known_args(argv)
+    ignored: list[str] = []
+    if prelim.profile:
+        profile = load_profile(prelim.profile)
+        ignored = _apply_profile(parser, profile)
+    args = parser.parse_args(argv)
     _setup_logging(logging.DEBUG if args.verbose else logging.INFO)
+    if ignored:
+        LOG.warning("profile had unknown keys (ignored)",
+                    extra={"profile": prelim.profile, "unknown": ignored})
 
     if args.check_only:
         return check_only(args)

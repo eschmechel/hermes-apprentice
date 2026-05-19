@@ -1,0 +1,27 @@
+# RunPod A100 80GB hyperparameter profile.
+#
+# A100 has 80 GB HBM2e + bf16 native. We skip 4-bit quantization (load_in_4bit:
+# false) because 16-bit LoRA on the unquantized base trains noticeably faster
+# at this VRAM tier, and the base+adapter fits comfortably (~3 GB for Qwen2.5-1.5B
+# in bf16).
+#
+# Per the trainer-03 acceptance: batch_size 16-32, LoRA 16-bit (no quantization),
+# training completes in < 10 min, configurable.
+
+base_model: "unsloth/Qwen2.5-1.5B-Instruct"
+load_in_4bit: false
+max_seq_len: 2048
+lora_rank: 16
+
+# 16 per-device * 1 grad-accum = effective batch 16. A100 can do 32 if seq_len
+# stays at 2048; bump batch_size to 32 if you observe < 50% SM utilization.
+batch_size: 16
+grad_accum: 1
+
+# A100 trains fast; bigger LR for bigger effective batch follows the linear
+# scaling rule.
+learning_rate: 0.0003
+warmup_steps: 10
+max_steps: 200
+
+seed: 3407
