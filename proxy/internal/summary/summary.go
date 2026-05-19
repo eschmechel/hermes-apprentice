@@ -15,19 +15,25 @@ import (
 )
 
 type logEntry struct {
-	Time          string   `json:"time"`
-	Msg           string   `json:"msg"`
-	RouteDecision string   `json:"route_decision"`
-	PatternID     string   `json:"pattern_id"`
-	LatencyMs     int64    `json:"latency_ms"`
-	Status        int      `json:"status"`
-	CostUSD       *float64 `json:"estimated_cost_usd"`
-	CostSavedUSD  float64  `json:"cost_saved_usd"`
+	Time          string  `json:"time"`
+	Msg           string  `json:"msg"`
+	RouteDecision string  `json:"route_decision"`
+	PatternID     string  `json:"pattern_id"`
+	// Accept both integer ("latency_ms":1) and float ("latency_ms":1.5)
+	// shapes. The proxy itself emits integer milliseconds via
+	// time.Duration.Milliseconds(), but the parser is a public seam — log
+	// pipelines that re-emit through tooling sometimes float-ify
+	// numeric fields, and silently dropping those entries is a worse
+	// failure mode than truncating sub-millisecond precision.
+	LatencyMs    float64  `json:"latency_ms"`
+	Status       int      `json:"status"`
+	CostUSD      *float64 `json:"estimated_cost_usd"`
+	CostSavedUSD float64  `json:"cost_saved_usd"`
 }
 
 type patternAgg struct {
 	volume    int
-	latencies []int64
+	latencies []float64
 	totalCost float64
 	costSaved float64
 	fallbacks int
@@ -110,7 +116,7 @@ func Generate(r io.Reader, since, until time.Time) (*Report, error) {
 	perPattern := make([]PatternResult, 0, len(keys))
 	var totalVol, totalFallbacks int
 	var totalCost, totalSaved float64
-	var allLatencies []int64
+	var allLatencies []float64
 
 	for _, pid := range keys {
 		agg := aggs[pid]
@@ -151,15 +157,15 @@ func buildResult(patternID string, agg *patternAgg) PatternResult {
 		return pr
 	}
 
-	var sumMs int64
+	var sumMs float64
 	for _, l := range agg.latencies {
 		sumMs += l
 	}
-	pr.AvgLatencyMs = float64(sumMs) / float64(len(agg.latencies))
+	pr.AvgLatencyMs = sumMs / float64(len(agg.latencies))
 
-	sorted := make([]int64, len(agg.latencies))
+	sorted := make([]float64, len(agg.latencies))
 	copy(sorted, agg.latencies)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	sort.Float64s(sorted)
 	n := float64(len(sorted))
 	p50Idx := int(n * 0.50)
 	p99Idx := int(n * 0.99)
@@ -169,8 +175,8 @@ func buildResult(patternID string, agg *patternAgg) PatternResult {
 	if p99Idx >= len(sorted) {
 		p99Idx = len(sorted) - 1
 	}
-	pr.P50Ms = float64(sorted[p50Idx])
-	pr.P99Ms = float64(sorted[p99Idx])
+	pr.P50Ms = sorted[p50Idx]
+	pr.P99Ms = sorted[p99Idx]
 
 	pr.FallbackRate = float64(agg.fallbacks) / float64(agg.volume)
 

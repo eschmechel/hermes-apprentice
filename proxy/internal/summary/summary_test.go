@@ -148,6 +148,50 @@ func TestGenerate_outsideWindow(t *testing.T) {
 	}
 }
 
+func TestGenerateAcceptsFloatLatency(t *testing.T) {
+	// Regression: the parser used to declare latency_ms as int64, so a
+	// re-emitted log pipeline that float-ified numeric fields produced
+	// silently-empty reports. Float latency must aggregate identically to
+	// integer latency.
+	now := time.Now().UTC().Round(time.Second)
+	lines := []map[string]any{
+		{
+			"time": now.Format(time.RFC3339), "msg": "request",
+			"route_decision": "specialist", "pattern_id": "p1",
+			"latency_ms": 1.5, "status": 200,
+			"estimated_cost_usd": 0.0, "cost_saved_usd": 0.001,
+		},
+		{
+			"time": now.Add(1 * time.Minute).Format(time.RFC3339), "msg": "request",
+			"route_decision": "specialist", "pattern_id": "p1",
+			"latency_ms": 2.5, "status": 200,
+			"estimated_cost_usd": 0.0, "cost_saved_usd": 0.002,
+		},
+	}
+	var sb strings.Builder
+	for _, m := range lines {
+		b, _ := json.Marshal(m)
+		sb.Write(b)
+		sb.WriteByte('\n')
+	}
+	since := time.Now().UTC().Add(-1 * time.Hour)
+	until := time.Now().UTC().Add(2 * time.Hour)
+	report, err := Generate(strings.NewReader(sb.String()), since, until)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if len(report.PerPattern) != 1 {
+		t.Fatalf("expected 1 pattern, got %d", len(report.PerPattern))
+	}
+	p := report.PerPattern[0]
+	if p.PatternID != "p1" || p.Volume != 2 {
+		t.Errorf("unexpected agg: %+v", p)
+	}
+	if p.AvgLatencyMs != 2.0 {
+		t.Errorf("expected avg 2.0ms (preserving sub-ms precision), got %v", p.AvgLatencyMs)
+	}
+}
+
 func TestResultIsValidJSON(t *testing.T) {
 	r := strings.NewReader(fixtureLines())
 	since := time.Now().UTC().Add(-1 * time.Hour)
