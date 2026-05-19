@@ -81,6 +81,7 @@ func serveCmd() *cobra.Command {
 			srv := httpapi.New(httpapi.Config{
 				Addr:   listenAddr,
 				Logger: logger,
+				Store:  obsStore,
 			})
 
 			handler := func(ctx context.Context, m poller.Message) error {
