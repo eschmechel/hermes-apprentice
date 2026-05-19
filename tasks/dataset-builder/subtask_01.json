@@ -1,17 +1,21 @@
 {
   "id": "dataset-builder-01",
   "seq": "01",
-  "title": "Python project scaffold: uv init, dependencies (unsloth, presidio, tokenizers, huggingface-hub)",
-  "status": "pending",
+  "title": "Go project scaffold + Presidio Docker sidecar",
+  "status": "completed",
+  "completed_at": "2026-05-19T04:06:00.000Z",
+  "completion_summary": "Scaffolded Go service with cobra CLI (build, decompress, version subcommands). All flags wired: pattern-id, observer-url, presidio-url, system-prompt/files, output-dir, model, api-key, prune-keep/older-than. 4 scaffold tests pass. Presidio Dockerfile created.",
   "depends_on": [],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": [],
+  "reference_files": ["detector/cmd/serve.go", "observer/cmd/serve.go"],
   "acceptance_criteria": [
-    "`uv run python -c \"import unsloth\"` succeeds",
-    "All dependencies install without errors",
-    "Project structure follows Python conventions"
+    "`dataset-builder --help` prints CLI help",
+    "`dataset-builder build --help` prints build flags",
+    "`dataset-builder decompress --help` prints decompress flags",
+    "`dataset-builder version` prints version",
+    "Presidio dockerfile present, docker pull succeeds"
   ],
-  "deliverables": ["pyproject.toml", "uv.lock", "project directory structure"]
+  "deliverables": ["main.go", "go.mod", "cmd/{root,build,decompress,version}.go", "Presidio.dockerfile"]
 }

@@ -1,17 +1,17 @@
 {
   "id": "dataset-builder-02",
   "seq": "02",
-  "title": "Implement record fetcher: pull records from Observer API for a pattern ID",
+  "title": "Fetch records from Observer API for a pattern ID",
   "status": "pending",
   "depends_on": [],
-  "parallel": false,
+  "parallel": true,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": ["observer /records endpoint"],
+  "reference_files": ["observer/internal/httpapi/server.go", "observer/internal/store/store.go"],
   "acceptance_criteria": [
-    "Fetches records from Observer HTTP API for a given pattern_id",
-    "Returns list of (input, output) pairs",
-    "Handles pagination and errors gracefully"
+    "Fetches records from observer GET /records?pattern=<id>",
+    "Returns list of (input, output) pairs with hash",
+    "Handles pagination (since param), empty results, and HTTP errors"
   ],
-  "deliverables": ["record_fetcher.py", "Observer API client"]
+  "deliverables": ["internal/fetcher/fetcher.go", "internal/fetcher/fetcher_test.go"]
 }

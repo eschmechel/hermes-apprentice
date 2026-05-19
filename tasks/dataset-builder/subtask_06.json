@@ -1,17 +1,17 @@
 {
   "id": "dataset-builder-06",
   "seq": "06",
-  "title": "Implement teacher augmentation: paraphrase inputs via big model for small datasets",
+  "title": "Teacher augmentation via OpenRouter for small datasets",
   "status": "pending",
   "depends_on": ["05"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": [],
+  "reference_files": ["detector/internal/describer/describer.go"],
   "acceptance_criteria": [
-    "For datasets < 200 pairs, uses big model to paraphrase inputs with preserved output schema",
+    "For datasets < 200 pairs, uses teacher model to paraphrase inputs",
     "25 seed pairs become ~200 after augmentation",
     "Paraphrases preserve the output structure/schema"
   ],
-  "deliverables": ["augmenter.py", "teacher model client"]
+  "deliverables": ["internal/augment/augment.go", "internal/augment/augment_test.go"]
 }

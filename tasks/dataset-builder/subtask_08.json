@@ -1,17 +1,18 @@
 {
   "id": "dataset-builder-08",
   "seq": "08",
-  "title": "Save versioned dataset to ~/apprentice/datasets/<pattern-id>/v<n>/ with manifest",
+  "title": "Versioned save + manifest + prune",
   "status": "pending",
   "depends_on": ["07"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": [],
+  "reference_files": ["detector/internal/patternstore/pattern_store.go"],
   "acceptance_criteria": [
-    "Saved to ~/apprentice/datasets/<pattern-id>/v<n>/ directory structure",
-    "Manifest has dataset_hash, row_count, augmentation_count",
-    "SHA-256 hash computed for the dataset"
+    "Saved to ~/apprentice/datasets/<pattern-id>/v<n>/",
+    "Manifest includes SHA-256 dataset hash, row counts, augmentation count",
+    "Decompress subcommand reads .gz files back to plain JSONL",
+    "Prune-keep and prune-older-than flags remove old versions"
   ],
-  "deliverables": ["versioned_saver.py", "dataset manifest.json", "versioned dataset directory"]
+  "deliverables": ["internal/versioned/versioned.go", "internal/versioned/versioned_test.go"]
 }

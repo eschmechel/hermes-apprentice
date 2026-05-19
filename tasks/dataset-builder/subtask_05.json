@@ -1,7 +1,7 @@
 {
   "id": "dataset-builder-05",
   "seq": "05",
-  "title": "Implement deduplication: fuzzy dedup on input text",
+  "title": "Fuzzy dedup on input text",
   "status": "pending",
   "depends_on": ["03", "04"],
   "parallel": false,
@@ -9,9 +9,9 @@
   "context_files": [],
   "reference_files": [],
   "acceptance_criteria": [
-    "Fuzzy dedup using edit distance > 0.85 threshold",
-    "Near-duplicate inputs produce one training row",
-    "Configurable similarity threshold"
+    "Jaccard similarity on bigram shingles > 0.85 → pair deduped",
+    "Keeps first occurrence of near-duplicates",
+    "Configurable threshold"
   ],
-  "deliverables": ["deduplicator.py"]
+  "deliverables": ["internal/dedup/dedup.go", "internal/dedup/dedup_test.go"]
 }

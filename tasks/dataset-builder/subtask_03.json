@@ -1,7 +1,7 @@
 {
   "id": "dataset-builder-03",
   "seq": "03",
-  "title": "Implement PII redaction pass via Presidio",
+  "title": "PII redaction via Presidio REST API",
   "status": "pending",
   "depends_on": ["01"],
   "parallel": false,
@@ -9,9 +9,9 @@
   "context_files": [],
   "reference_files": [],
   "acceptance_criteria": [
-    "Names, emails, phones, addresses detected and replaced with placeholder tokens",
-    "john@email.com becomes [EMAIL_1]",
-    "Presidio analyzer + anonymizer pipeline works"
+    "Names, emails, phones, addresses replaced with [EMAIL_1], [PERSON_1], etc.",
+    "Presidio /analyze + /anonymize REST calls succeed",
+    "Placeholder tokens are stable (same input → same replacement)"
   ],
-  "deliverables": ["pii_redactor.py", "Presidio pipeline config"]
+  "deliverables": ["internal/redactor/redactor.go", "internal/redactor/redactor_test.go"]
 }
