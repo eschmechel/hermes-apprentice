@@ -1,0 +1,27 @@
+[project]
+name = "apprentice-validator"
+version = "0.1.0"
+description = "Apprentice validator: evaluation gate for trained specialist models."
+requires-python = ">=3.10,<3.13"
+
+# apprentice-trainer pinned via editable install so manifest_signer imports work.
+# vllm is the inference engine (offline batch mode, no server dependency).
+# Remaining deps are lightweight — see trainer's pyproject.toml for the pattern.
+dependencies = [
+    "apprentice-trainer",
+    "cryptography>=42",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+apprentice-validate = "apprentice_validator.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apprentice_validator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
