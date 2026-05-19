@@ -1,0 +1,25 @@
+[project]
+name = "apprentice-trainer"
+version = "0.1.0"
+description = "Apprentice trainer: Unsloth QLoRA fine-tuning of Qwen2.5-1.5B-Instruct from observer datasets."
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+
+# Lightweight deps only — Unsloth + torch + bitsandbytes are CUDA-specific and
+# installed separately. See README.md for the `uv pip install` command that
+# pulls the right extra for your CUDA version.
+dependencies = [
+    "datasets>=2.20",
+    "pyyaml>=6.0",
+    "huggingface-hub>=0.24",
+]
+
+[project.scripts]
+apprentice-train = "apprentice_trainer.train:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apprentice_trainer"]
