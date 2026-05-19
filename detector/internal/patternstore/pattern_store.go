@@ -1,5 +1,5 @@
 // Package patternstore persists candidate detector patterns to disk as
-// ~/apprentice/patterns/<id>/manifest.json.  Each pattern includes the
+// ~/.apprentice/patterns/<id>/manifest.json.  Each pattern includes the
 // cluster centroid, LLM-generated description, record count, and status.
 // Satisfies detector-05.
 package patternstore

@@ -1,7 +1,7 @@
 """Unsloth QLoRA fine-tuning entrypoint for the Apprentice pipeline.
 
 Reads a versioned dataset directory produced by ``dataset-builder``
-(``~/apprentice/datasets/<pattern>/v<N>/{train,val,test}.jsonl.gz``), loads
+(``~/.apprentice/datasets/<pattern>/v<N>/{train,val,test}.jsonl.gz``), loads
 Qwen2.5-1.5B-Instruct in 4-bit, attaches a LoRA rank-16 adapter, runs SFT,
 and saves the LoRA adapter to ``--output-dir``.
 
@@ -11,8 +11,8 @@ Merged-model export, training manifest, and signing live in sibling modules
 Usage (after `uv pip install -e .[gpu]` — see README for the CUDA-specific extra):
 
     apprentice-train \\
-        --dataset-dir ~/apprentice/datasets/<pattern-id>/v1 \\
-        --output-dir   ~/apprentice/checkpoints/<pattern-id>/v1 \\
+        --dataset-dir ~/.apprentice/datasets/<pattern-id>/v1 \\
+        --output-dir   ~/.apprentice/checkpoints/<pattern-id>/v1 \\
         --max-steps    60 \\
         --batch-size   2 \\
         --grad-accum   4

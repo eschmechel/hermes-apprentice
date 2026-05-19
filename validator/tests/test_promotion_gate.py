@@ -60,3 +60,20 @@ def test_teacher_score_is_recorded_but_not_used():
 def test_verdict_contains_margin():
     verdict = evaluate(make_comparison(delta_em=0.20, delta_f1=0.20))
     assert verdict["margin"] == 0.1
+
+
+def test_pass_reason_uses_percentage_points():
+    """Reason string should show deltas in percentage points (multiplied by 100).
+    Regression: previously emitted ``"0.2pp"`` for a 0.20 fraction.
+    """
+    verdict = evaluate(make_comparison(delta_em=0.20, delta_f1=0.25))
+    assert "20.0pp" in verdict["reason"]
+    assert "25.0pp" in verdict["reason"]
+    assert "margin=10pp" in verdict["reason"]
+
+
+def test_fail_reason_uses_percentage_points():
+    verdict = evaluate(make_comparison(delta_em=0.05, delta_f1=0.03))
+    assert "5.0pp" in verdict["reason"]
+    assert "3.0pp" in verdict["reason"]
+    assert "10pp" in verdict["reason"]

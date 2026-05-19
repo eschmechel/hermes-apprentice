@@ -1,7 +1,7 @@
 """Failure reporter (validator-06).
 
 When a model fails the promotion gate, writes a structured failure report to
-``~/apprentice/failures/<run-id>.json`` with scores, dataset info, and
+``~/.apprentice/failures/<run-id>.json`` with scores, dataset info, and
 suggested remediation steps.
 """
 
@@ -17,7 +17,7 @@ from . import promotion_gate
 
 LOG = logging.getLogger("apprentice_validator.failure")
 
-DEFAULT_FAILURES_DIR = Path.home() / "apprentice" / "failures"
+DEFAULT_FAILURES_DIR = Path.home() / ".apprentice" / "failures"
 
 SUGGESTIONS: dict[str, str] = {
     "f1": (

@@ -13,8 +13,8 @@ Usage::
 
     apprentice-merge \\
         --base-model unsloth/Qwen2.5-1.5B-Instruct \\
-        --adapter-dir ~/apprentice/checkpoints/<pattern-id>/v1/lora-adapter \\
-        --output-dir  ~/apprentice/merged/<pattern-id>/v1
+        --adapter-dir ~/.apprentice/checkpoints/<pattern-id>/v1/lora-adapter \\
+        --output-dir  ~/.apprentice/merged/<pattern-id>/v1
 
 Output directory contains ``config.json``, ``model.safetensors`` (potentially
 sharded across ``model-NNNNN-of-NNNNN.safetensors``), tokenizer files, and the

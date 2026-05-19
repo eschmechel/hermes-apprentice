@@ -1,7 +1,7 @@
 """Model registry (validator-05).
 
 On a passing evaluation, copies the merged model into the Apprentice registry
-at ``~/apprentice/registry/<pattern-id>/v<n>/``, auto-increments the version
+at ``~/.apprentice/registry/<pattern-id>/v<n>/``, auto-increments the version
 number, and writes a signed registry manifest.
 """
 
@@ -19,7 +19,7 @@ from apprentice_trainer.manifest_signer import sign_manifest, verify_manifest
 
 LOG = logging.getLogger("apprentice_validator.registry")
 
-DEFAULT_REGISTRY_ROOT = Path.home() / "apprentice" / "registry"
+DEFAULT_REGISTRY_ROOT = Path.home() / ".apprentice" / "registry"
 
 MANIFEST_SOURCE = "training_manifest.json"
 REGISTRY_MANIFEST = "registry_manifest.json"

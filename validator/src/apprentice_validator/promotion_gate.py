@@ -46,11 +46,12 @@ def evaluate(
     em_ok = delta_em >= MARGIN
     f1_ok = delta_f1 >= MARGIN
 
+    margin_pp = MARGIN * 100
     if em_ok and f1_ok:
         passed = True
         reason = (
-            f"specialist exceeds baseline by {delta_em:.1f}pp exact-match "
-            f"and {delta_f1:.1f}pp F1 (margin={MARGIN}pp)"
+            f"specialist exceeds baseline by {delta_em * 100:.1f}pp exact-match "
+            f"and {delta_f1 * 100:.1f}pp F1 (margin={margin_pp:.0f}pp)"
         )
         LOG.info("gate passed", extra={
             "delta_exact_match": delta_em,
@@ -61,9 +62,9 @@ def evaluate(
         passed = False
         failures = []
         if not em_ok:
-            failures.append(f"exact-match delta {delta_em:.1f} < {MARGIN}")
+            failures.append(f"exact-match delta {delta_em * 100:.1f}pp < {margin_pp:.0f}pp")
         if not f1_ok:
-            failures.append(f"F1 delta {delta_f1:.1f} < {MARGIN}")
+            failures.append(f"F1 delta {delta_f1 * 100:.1f}pp < {margin_pp:.0f}pp")
         reason = "; ".join(failures)
         LOG.info("gate failed", extra={
             "delta_exact_match": delta_em,

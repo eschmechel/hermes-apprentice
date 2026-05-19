@@ -1,10 +1,11 @@
 """Baseline runner (validator-02).
 
 Runs the same test set through the raw Qwen2.5-1.5B-Instruct model (not the
-specialist) using vLLM offline batch API.  Uses a few-shot prompt prefix to
-nudge the model toward completing in the expected format, then collects
-(expected, actual) pairs in the same shape as test_runner so metrics can
-compare directly.
+specialist) using vLLM offline batch API and collects (expected, actual)
+pairs in the same shape as ``test_runner`` so metrics can compare directly.
+
+The prompt for each record is the same message list given to the specialist,
+truncated to exclude the final assistant turn (the held-out answer).
 """
 
 from __future__ import annotations
@@ -58,8 +59,7 @@ def run_baseline(
     )
 
     # Build conversations. The prompt includes all messages up to (but not
-    # including) the last assistant turn, prefixed with a few-shot
-    # demonstration so the base model understands the desired output format.
+    # including) the last assistant turn (the held-out answer).
     prompts: list[list[dict[str, str]]] = []
     expectations: list[str] = []
     for rec in records:

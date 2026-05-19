@@ -1,4 +1,4 @@
-// Package versioned persists datasets under ~/apprentice/datasets/<pattern-id>/v<n>/
+// Package versioned persists datasets under ~/.apprentice/datasets/<pattern-id>/v<n>/
 // with a manifest.json per version, and provides version pruning.  Satisfies
 // dataset-builder-08.
 package versioned

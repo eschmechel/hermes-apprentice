@@ -8,6 +8,7 @@ so the module is self-contained and doesn't depend on a specific tokenizer.
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from typing import Any
 
 LOG = logging.getLogger("apprentice_validator.metrics")
@@ -34,18 +35,22 @@ def exact_match(expected: str, actual: str) -> bool:
 
 
 def _precision_recall_f1(expected_toks: list[str], actual_toks: list[str]) -> tuple[float, float, float]:
-    """Return (precision, recall, f1) for token sets."""
-    exp_set = set(expected_toks)
-    act_set = set(actual_toks)
-    if not exp_set and not act_set:
+    """Return SQuAD-style token-level (precision, recall, f1).
+
+    Uses multiset (``Counter``) intersection so duplicate tokens are not
+    collapsed: ``"cat cat dog"`` vs ``"cat dog dog"`` correctly produces
+    F1 < 1.0.
+    """
+    if not expected_toks and not actual_toks:
         return 1.0, 1.0, 1.0
-    if not exp_set or not act_set:
+    if not expected_toks or not actual_toks:
         return 0.0, 0.0, 0.0
-    intersection = exp_set & act_set
-    prec = len(intersection) / len(act_set)
-    rec = len(intersection) / len(exp_set)
-    if prec + rec == 0:
+    common = Counter(expected_toks) & Counter(actual_toks)
+    overlap = sum(common.values())
+    if overlap == 0:
         return 0.0, 0.0, 0.0
+    prec = overlap / len(actual_toks)
+    rec = overlap / len(expected_toks)
     f1 = 2 * prec * rec / (prec + rec)
     return prec, rec, f1
 

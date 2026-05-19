@@ -3,7 +3,7 @@
 Python package that fine-tunes [Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) into a task specialist using [Unsloth](https://github.com/unslothai/unsloth) QLoRA (4-bit base + LoRA rank-16 adapters). The training set comes from `dataset-builder`'s versioned output:
 
 ```
-~/apprentice/datasets/<pattern-id>/v<N>/{train,val,test}.jsonl.gz
+~/.apprentice/datasets/<pattern-id>/v<N>/{train,val,test}.jsonl.gz
 ```
 
 Each line is a Hermes chat-template record: `{"messages": [{"role": "system", "content": "…"}, {"role": "user", "content": "…"}, {"role": "assistant", "content": "…"}]}`.
@@ -36,8 +36,8 @@ If your CUDA version differs, browse [Unsloth's install matrix](https://github.c
 
 ```bash
 apprentice-train \
-    --dataset-dir ~/apprentice/datasets/<pattern-id>/v1 \
-    --output-dir  ~/apprentice/checkpoints/<pattern-id>/v1 \
+    --dataset-dir ~/.apprentice/datasets/<pattern-id>/v1 \
+    --output-dir  ~/.apprentice/checkpoints/<pattern-id>/v1 \
     --max-steps   60 \
     --batch-size  2 \
     --grad-accum  4
@@ -46,7 +46,7 @@ apprentice-train \
 Output:
 
 ```
-~/apprentice/checkpoints/<pattern-id>/v1/
+~/.apprentice/checkpoints/<pattern-id>/v1/
 ├── checkpoints/                  # transformers Trainer intermediate state (save_strategy=no, kept empty)
 └── lora-adapter/                 # final LoRA weights + tokenizer config
     ├── adapter_config.json
@@ -63,7 +63,7 @@ To verify the script parses args + reads the dataset on a pure-CPU host (no Unsl
 
 ```bash
 apprentice-train --check-only \
-    --dataset-dir ~/apprentice/datasets/<pattern-id>/v1 \
+    --dataset-dir ~/.apprentice/datasets/<pattern-id>/v1 \
     --output-dir  /tmp/ignored
 ```
 

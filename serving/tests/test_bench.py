@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import time
 from pathlib import Path
 
 from apprentice_serving.bench import (
@@ -100,6 +101,80 @@ def test_compute_stats_percentiles():
     ]
     stats = compute_stats(results)
     assert stats["p50_ms"] == 50.5
+
+
+def test_run_benchmark_concurrency_actually_parallelizes(monkeypatch):
+    """Regression for serving-03 bug: --concurrency > 1 must run in parallel,
+    not silently sequentially.  We assert that with concurrency=5 and a
+    100ms-per-request fake server, 10 requests complete in well under
+    the sequential bound of 1.0s.
+    """
+    import threading
+    from apprentice_serving import bench as bench_mod
+
+    in_flight = 0
+    peak_in_flight = 0
+    lock = threading.Lock()
+
+    def fake_send_one(_endpoint, _prompt, _max_tokens, _timeout):
+        nonlocal in_flight, peak_in_flight
+        with lock:
+            in_flight += 1
+            if in_flight > peak_in_flight:
+                peak_in_flight = in_flight
+        time.sleep(0.1)
+        with lock:
+            in_flight -= 1
+        return ({}, 200, 5)
+
+    monkeypatch.setattr(bench_mod, "_send_one", fake_send_one)
+
+    prompts = [f"q{i}" for i in range(10)]
+    t0 = time.monotonic()
+    results = bench_mod.run_benchmark(
+        endpoint="http://fake",
+        prompts=prompts,
+        max_tokens=8,
+        concurrency=5,
+        warmup=0,
+    )
+    elapsed = time.monotonic() - t0
+
+    assert len(results) == 10
+    assert [r["index"] for r in results] == list(range(10)), "input order preserved"
+    assert peak_in_flight >= 2, f"expected concurrent in-flight, peak was {peak_in_flight}"
+    assert elapsed < 0.6, f"10x100ms with c=5 should finish well under 1s, got {elapsed:.2f}s"
+
+
+def test_run_benchmark_sequential_when_concurrency_one(monkeypatch):
+    """With concurrency=1 we keep the sequential path (no thread pool overhead)."""
+    import threading
+    from apprentice_serving import bench as bench_mod
+
+    in_flight = 0
+    peak_in_flight = 0
+    lock = threading.Lock()
+
+    def fake_send_one(_endpoint, _prompt, _max_tokens, _timeout):
+        nonlocal in_flight, peak_in_flight
+        with lock:
+            in_flight += 1
+            if in_flight > peak_in_flight:
+                peak_in_flight = in_flight
+        time.sleep(0.02)
+        with lock:
+            in_flight -= 1
+        return ({}, 200, 1)
+
+    monkeypatch.setattr(bench_mod, "_send_one", fake_send_one)
+    bench_mod.run_benchmark(
+        endpoint="http://fake",
+        prompts=["a", "b", "c"],
+        max_tokens=8,
+        concurrency=1,
+        warmup=0,
+    )
+    assert peak_in_flight == 1
 
 
 def test_print_stats_json_output(capfd):

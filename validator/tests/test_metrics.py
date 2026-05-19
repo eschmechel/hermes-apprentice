@@ -79,6 +79,22 @@ def test_compute_metrics_all_wrong():
     assert result["f1"] == 0.0
 
 
+def test_f1_uses_multiset_not_set():
+    """Regression: F1 must use multiset intersection so repeated tokens
+    on one side don't get a free pass against repeats on the other.
+
+    expected: "cat cat dog"  → multiset {cat:2, dog:1} (sum=3)
+    actual:   "cat dog dog"  → multiset {cat:1, dog:2} (sum=3)
+    overlap multiset = {cat:1, dog:1} (sum=2)
+    prec = rec = 2/3 → f1 = 2/3
+    With the old set-based code, f1 would have been 1.0.
+    """
+    pairs = [{"expected": "cat cat dog", "actual": "cat dog dog"}]
+    result = compute_metrics(pairs)
+    assert 0.5 < result["f1"] < 0.8, f"expected ~0.667, got {result['f1']}"
+    assert result["f1"] != 1.0
+
+
 def test_compare_metrics():
     specialist = {"exact_match": 0.50, "f1": 0.65, "count": 100}
     baseline = {"exact_match": 0.30, "f1": 0.40, "count": 100}

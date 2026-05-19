@@ -42,9 +42,9 @@ func serveCmd() *cobra.Command {
 	}
 
 	home, _ := os.UserHomeDir()
-	defaultRegistry := filepath.Join(home, "apprentice", "registry")
+	defaultRegistry := filepath.Join(home, ".apprentice", "registry")
 
 	cmd.Flags().StringVar(&listenAddr, "listen", ":8082", "HTTP listen address")
-	cmd.Flags().StringVar(&registryDir, "registry-dir", defaultRegistry, "Registry root directory (~/apprentice/registry)")
+	cmd.Flags().StringVar(&registryDir, "registry-dir", defaultRegistry, "Registry root directory (~/.apprentice/registry)")
 	return cmd
 }

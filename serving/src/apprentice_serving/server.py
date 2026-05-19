@@ -18,7 +18,6 @@ import shlex
 import signal
 import subprocess
 import sys
-import time
 from pathlib import Path
 from typing import Any
 
@@ -100,18 +99,19 @@ def build_vllm_cmd(
     ]
 
 
-def launch_server(cmd: list[str], timeout: float = 30.0) -> int:
-    """Run *cmd* as a foreground subprocess, forwarding signals.
-
-    Returns the subprocess exit code.
+def launch_server(cmd: list[str]) -> int:
+    """Run *cmd* as a foreground subprocess, forwarding SIGINT/SIGTERM, and
+    block until it exits.  Returns the subprocess exit code.
     """
     LOG.info("launching vLLM", extra={"cmd": shlex.join(cmd)})
     proc = subprocess.Popen(
         cmd,
         stdout=sys.stdout,
         stderr=sys.stderr,
-        # Place the subprocess in its own foreground process group so that
-        # Ctrl+C is delivered to both the launcher and vllm.
+        # Put vLLM in its own process group so the terminal's Ctrl+C
+        # (delivered to the foreground pgrp) only reaches the launcher.
+        # We then forward the signal explicitly below — this lets the launcher
+        # log the shutdown and clean up its own state before vLLM dies.
         preexec_fn=os.setpgrp if sys.platform != "win32" else None,
     )
 
@@ -122,13 +122,7 @@ def launch_server(cmd: list[str], timeout: float = 30.0) -> int:
     orig_sigint = signal.signal(signal.SIGINT, forward_signal)
     orig_sigterm = signal.signal(signal.SIGTERM, forward_signal)
     try:
-        # Wait for the subprocess.  If it doesn't start up in time we bail.
-        try:
-            return proc.wait(timeout=timeout)
-        except subprocess.TimeoutExpired:
-            # vLLM didn't finish within *timeout* — it's likely still serving.
-            # Stay alive until the subprocess exits naturally.
-            return proc.wait()
+        return proc.wait()
     finally:
         signal.signal(signal.SIGINT, orig_sigint)
         signal.signal(signal.SIGTERM, orig_sigterm)

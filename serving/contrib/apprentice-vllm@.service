@@ -6,6 +6,12 @@ Requires=registry-service.service
 
 [Service]
 Type=simple
+# Override User= with `systemctl edit apprentice-vllm@<pattern>` to run as
+# your account, or create a dedicated `apprentice` user that owns
+# ~/.apprentice/registry.  Do NOT leave User= unset — vLLM as root has full
+# access to the host's GPU device files with no isolation.
+User=apprentice
+Group=apprentice
 ExecStartPre=/usr/bin/apprentice-serve --check-only --pattern-id %i
 ExecStart=/usr/bin/apprentice-serve --pattern-id %i
 Restart=on-failure
@@ -16,7 +22,7 @@ Environment="PATH=/usr/local/bin:/usr/bin:/bin"
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=%h/apprentice/registry
+ReadWritePaths=%h/.apprentice/registry
 PrivateTmp=yes
 
 [Install]

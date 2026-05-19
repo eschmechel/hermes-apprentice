@@ -15,8 +15,9 @@ import math
 import statistics
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import httpx
 
@@ -65,16 +66,20 @@ def run_benchmark(
 ) -> list[Result]:
     """Send each prompt to *endpoint* and record per-request timing.
 
-    Returns a list of result dicts::
+    With ``concurrency=1`` the benchmark is sequential.  With ``concurrency>1``
+    a thread pool of that size is used so up to that many requests are
+    in-flight simultaneously — useful for measuring throughput under load
+    rather than serial latency.
 
-        {index, latency_ms, status_code, tokens, prompt_chars}
+    Returns one result dict per prompt, in input order::
+
+        {index, latency_ms, status_code, tokens, prompt_chars, [error]}
     """
     if not prompts:
         return []
 
-    results: list[Result] = []
-
-    # Warmup — not measured.
+    # Warmup — not measured.  Always sequential; warmup is for cache warming,
+    # not load testing.
     for i in range(min(warmup, len(prompts))):
         LOG.debug("warmup request", extra={"index": i})
         try:
@@ -82,32 +87,54 @@ def run_benchmark(
         except Exception:
             pass
 
-    # Measured.
-    for i, prompt in enumerate(prompts):
-        LOG.debug("bench request", extra={"index": i, "concurrency": concurrency})
-        t0 = time.monotonic()
-        try:
-            resp_data, status, tokens = _send_one(endpoint, prompt, max_tokens, timeout)
-            elapsed = (time.monotonic() - t0) * 1000
-            results.append({
-                "index": i,
-                "latency_ms": round(elapsed, 2),
-                "status_code": status,
-                "tokens": tokens,
-                "prompt_chars": len(prompt),
-            })
-        except Exception as e:
-            elapsed = (time.monotonic() - t0) * 1000
-            results.append({
-                "index": i,
-                "latency_ms": round(elapsed, 2),
-                "status_code": 0,
-                "error": str(e),
-                "tokens": 0,
-                "prompt_chars": len(prompt),
-            })
+    if concurrency <= 1:
+        return [_measure_one(endpoint, i, p, max_tokens, timeout) for i, p in enumerate(prompts)]
 
-    return results
+    # In-flight requests up to *concurrency*.  Results gathered out of order
+    # then re-sorted by index so the caller sees input order.
+    results: list[Result | None] = [None] * len(prompts)
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        futures = {
+            pool.submit(_measure_one, endpoint, i, p, max_tokens, timeout): i
+            for i, p in enumerate(prompts)
+        }
+        for fut in as_completed(futures):
+            i = futures[fut]
+            results[i] = fut.result()
+    # mypy/type-checker comfort: all slots are now filled.
+    return [r for r in results if r is not None]
+
+
+def _measure_one(
+    endpoint: str,
+    index: int,
+    prompt: str,
+    max_tokens: int,
+    timeout: float,
+) -> Result:
+    """Send one request, return a Result dict.  Never raises."""
+    LOG.debug("bench request", extra={"index": index})
+    t0 = time.monotonic()
+    try:
+        _resp_data, status, tokens = _send_one(endpoint, prompt, max_tokens, timeout)
+        elapsed = (time.monotonic() - t0) * 1000
+        return {
+            "index": index,
+            "latency_ms": round(elapsed, 2),
+            "status_code": status,
+            "tokens": tokens,
+            "prompt_chars": len(prompt),
+        }
+    except Exception as e:
+        elapsed = (time.monotonic() - t0) * 1000
+        return {
+            "index": index,
+            "latency_ms": round(elapsed, 2),
+            "status_code": 0,
+            "error": str(e),
+            "tokens": 0,
+            "prompt_chars": len(prompt),
+        }
 
 
 def compute_stats(results: list[Result]) -> Stats:
