@@ -224,25 +224,28 @@ func TestList_MissingDir(t *testing.T) {
 
 func TestManifest_JSONRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	s := New(dir)
+	ps, err := Open(dir)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
 
 	orig := Manifest{
-		ID:          "test-roundtrip",
+		ID:          "a0000000-0000-0000-0000-000000000001",
 		Description: "JSON round-trip test",
 		Centroid:    []float32{1.5, 2.5},
 		RecordCount: 99,
 		Status:      StatusCandidate,
 		CreatedAt:   time.Date(2026, 5, 19, 12, 0, 0, 0, time.UTC),
 	}
-	id, err := s.Save(orig)
+	id, err := ps.Save(orig)
 	if err != nil {
 		t.Fatalf("Save: %v", err)
 	}
-	if id != "test-roundtrip" {
+	if id != orig.ID {
 		t.Fatalf("id mismatch: %q", id)
 	}
 
-	loaded, err := s.Load(id)
+	loaded, err := ps.Load(id)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

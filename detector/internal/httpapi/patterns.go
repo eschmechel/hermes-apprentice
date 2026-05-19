@@ -3,9 +3,12 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 
 	"github.com/hermes-apprentice/detector/internal/patternstore"
 )
+
+var uuidRE = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 type PatternHandler struct {
 	store *patternstore.Store
@@ -44,6 +47,10 @@ func (h *PatternHandler) handleApprove(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if id == "" {
 		writeError(w, http.StatusBadRequest, "missing pattern id")
+		return
+	}
+	if !uuidRE.MatchString(id) {
+		writeError(w, http.StatusBadRequest, "invalid pattern id format")
 		return
 	}
 	if h.store == nil {

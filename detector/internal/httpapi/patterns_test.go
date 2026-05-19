@@ -115,7 +115,7 @@ func TestApprovePattern_NotFound(t *testing.T) {
 	mux := http.NewServeMux()
 	NewPatternHandler(ps).Register(mux)
 
-	req := httptest.NewRequest("POST", "/patterns/nonexistent/approve", nil)
+	req := httptest.NewRequest("POST", "/patterns/00000000-0000-0000-0000-000000000000/approve", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 

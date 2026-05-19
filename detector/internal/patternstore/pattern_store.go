@@ -9,10 +9,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var idRE = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+func validID(id string) bool { return idRE.MatchString(id) }
 
 // Status values for a pattern lifecycle.
 const (
@@ -82,6 +87,9 @@ func (s *Store) Save(m Manifest) (string, error) {
 
 // Load reads the Manifest for the given pattern ID.
 func (s *Store) Load(id string) (Manifest, error) {
+	if !validID(id) {
+		return Manifest{}, fmt.Errorf("patternstore: invalid id %q", id)
+	}
 	path := filepath.Join(s.baseDir, id, "manifest.json")
 	f, err := os.Open(path)
 	if err != nil {
@@ -121,6 +129,9 @@ func (s *Store) List() ([]Manifest, error) {
 
 // SetStatus updates the status field of a pattern's manifest.
 func (s *Store) SetStatus(id, status string) error {
+	if !validID(id) {
+		return fmt.Errorf("patternstore: invalid id %q", id)
+	}
 	m, err := s.Load(id)
 	if err != nil {
 		return err
