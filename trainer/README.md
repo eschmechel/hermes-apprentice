@@ -69,6 +69,40 @@ apprentice-train --check-only \
 
 This loads `train.jsonl.gz` and `val.jsonl.gz`, validates each row has a `messages` field, and exits. Used by CI and the dataset-builder regression check.
 
+## Custom profiles for your own hardware
+
+The three profiles shipped under `trainer/profiles/` cover the targets we test on. If you're training on different hardware, write your own YAML — any key matching an `apprentice-train` long-option `dest` becomes a default:
+
+```yaml
+# ~/.config/apprentice-trainer/my-3090.yaml — example
+base_model: "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit"
+load_in_4bit: true
+max_seq_len: 4096
+lora_rank: 16
+
+batch_size: 4
+grad_accum: 4
+learning_rate: 0.0002
+warmup_steps: 5
+max_steps: 100
+seed: 3407
+```
+
+Three ways to apply it:
+
+```bash
+# 1. Explicit per-run.
+apprentice-train --profile ~/.config/apprentice-trainer/my-3090.yaml ...
+
+# 2. Sticky default for this shell.
+export APPRENTICE_TRAINER_PROFILE=~/.config/apprentice-trainer/my-3090.yaml
+apprentice-train ...
+
+# 3. Sticky default for your account — drop the export into ~/.bashrc / ~/.zshrc.
+```
+
+Unknown keys are reported as a `WARNING` in the JSON log and ignored — safe to add `comment:` or `# vim: ft=yaml` headers. CLI flags always win over the profile, so `--batch-size 2` on the command line overrides the profile's `batch_size: 4`.
+
 ## Defaults
 
 | Flag | Default | Notes |

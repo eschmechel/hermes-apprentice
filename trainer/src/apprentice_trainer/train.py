@@ -274,10 +274,13 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Path to a versioned dataset dir (contains train.jsonl.gz, val.jsonl.gz).")
     p.add_argument("--output-dir", required=True,
                    help="Where to write the LoRA adapter + training checkpoints.")
-    p.add_argument("--profile", default=None,
+    p.add_argument("--profile", default=os.environ.get("APPRENTICE_TRAINER_PROFILE"),
                    help="YAML profile whose keys override built-in defaults. "
                         "Profile keys correspond to long-option dest names "
-                        "(e.g. base_model, batch_size). Explicit CLI flags still win.")
+                        "(e.g. base_model, batch_size). Explicit CLI flags still win. "
+                        "Defaults to $APPRENTICE_TRAINER_PROFILE so users can drop a "
+                        "personal profile at e.g. ~/.config/apprentice-trainer/local.yaml "
+                        "and have it auto-applied.")
     p.add_argument("--base-model", default="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
                    help="HF model id; defaults to the Unsloth-prequantized Qwen2.5-1.5B.")
     p.add_argument("--load-in-4bit", action=argparse.BooleanOptionalAction, default=True,

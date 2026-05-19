@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 apprentice-train = "apprentice_trainer.train:main"
+apprentice-merge = "apprentice_trainer.model_exporter:main"
 
 [build-system]
 requires = ["hatchling"]
