@@ -2,8 +2,10 @@
   "id": "proxy-07",
   "seq": "07",
   "title": "Implement pattern registration endpoint: POST /patterns",
-  "status": "pending",
-  "depends_on": ["03"],
+  "status": "completed",
+  "depends_on": [
+    "03"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -13,5 +15,8 @@
     "Proxy hot-reloads patterns without restart",
     "New patterns are immediately available for matching"
   ],
-  "deliverables": ["pattern_registration_handler.go", "hot-reload pattern store"]
+  "deliverables": [
+    "pattern_registration_handler.go",
+    "hot-reload pattern store"
+  ]
 }

@@ -2,16 +2,24 @@
   "id": "proxy-03",
   "seq": "03",
   "title": "Implement pattern matching: embed input via BGE-small, cosine against centroids",
-  "status": "pending",
-  "depends_on": ["01"],
+  "status": "completed",
+  "depends_on": [
+    "01"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": ["detector BGE-small embedder", "detector pattern manifest schema"],
+  "reference_files": [
+    "detector BGE-small embedder",
+    "detector pattern manifest schema"
+  ],
   "acceptance_criteria": [
     "Embeds incoming input via BGE-small ONNX model",
     "Computes cosine similarity against registered pattern centroids",
     "Inputs above threshold cosine match to correct pattern"
   ],
-  "deliverables": ["pattern_matcher.go", "embedder client"]
+  "deliverables": [
+    "pattern_matcher.go",
+    "embedder client"
+  ]
 }

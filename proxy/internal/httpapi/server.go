@@ -1,0 +1,122 @@
+// Package httpapi implements the Apprentice Proxy HTTP server.  The proxy
+// exposes:
+//
+//   GET  /healthz                  liveness check
+//   POST /v1/chat/completions      OpenAI-compatible chat-completions endpoint
+//                                   that routes to a specialist when the last
+//                                   user message embeds close to a registered
+//                                   pattern, and otherwise proxies to upstream.
+//   POST /patterns                 register or replace a pattern (called by
+//                                   the detector after operator approval).
+//   GET  /patterns                 list registered patterns.
+package httpapi
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/hermes-apprentice/proxy/internal/patterns"
+)
+
+// Embedder is the minimal surface the proxy needs from the BGE-small
+// embedder.  Defined here (consumer side) so tests can inject a fake without
+// pulling in ONNX runtime.
+type Embedder interface {
+	Embed(text string) ([]float32, error)
+}
+
+type Config struct {
+	Addr   string
+	Logger *slog.Logger
+
+	UpstreamURL    string
+	Embedder       Embedder
+	PatternStore   *patterns.Store
+	MatchThreshold float32
+	ShadowRate     float64
+
+	// HTTPClient is optional; if nil, a default client with a long timeout is
+	// constructed.  Tests inject a client pointing at httptest.Server.
+	HTTPClient *http.Client
+}
+
+type Server struct {
+	cfg    Config
+	srv    *http.Server
+	logger *slog.Logger
+}
+
+func New(cfg Config) *Server {
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
+	}
+	if cfg.HTTPClient == nil {
+		cfg.HTTPClient = &http.Client{Timeout: 120 * time.Second}
+	}
+	if cfg.MatchThreshold == 0 {
+		cfg.MatchThreshold = 0.78
+	}
+
+	mux := http.NewServeMux()
+	s := &Server{cfg: cfg, logger: cfg.Logger}
+
+	mux.HandleFunc("GET /healthz", s.handleHealth)
+
+	ph := newProxyHandler(cfg)
+	mux.HandleFunc("POST /v1/chat/completions", ph.handleChatCompletions)
+
+	pat := newPatternsHandler(cfg.PatternStore, cfg.Logger)
+	mux.HandleFunc("POST /patterns", pat.handleRegister)
+	mux.HandleFunc("GET /patterns", pat.handleList)
+
+	s.srv = &http.Server{
+		Addr:              cfg.Addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      120 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+	return s
+}
+
+func (s *Server) ListenAndServe(ctx context.Context) error {
+	s.logger.Info("http listening", "addr", s.cfg.Addr)
+
+	go func() {
+		<-ctx.Done()
+		s.logger.Info("shutting down http server")
+		_ = s.Shutdown(context.Background())
+	}()
+
+	err := s.srv.ListenAndServe()
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
+}
+
+func (s *Server) Handler() http.Handler {
+	return s.srv.Handler
+}
+
+func (s *Server) Shutdown(ctx context.Context) error {
+	shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	return s.srv.Shutdown(shutdownCtx)
+}
+
+func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+
+func writeError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
+}

@@ -2,8 +2,10 @@
   "id": "proxy-02",
   "seq": "02",
   "title": "Implement upstream pass-through: non-matching requests to OpenRouter",
-  "status": "pending",
-  "depends_on": ["01"],
+  "status": "completed",
+  "depends_on": [
+    "01"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -13,5 +15,8 @@
     "Request reaches OpenRouter, response returns to caller",
     "Timeout and error handling implemented"
   ],
-  "deliverables": ["upstream_router.go", "OpenRouter client"]
+  "deliverables": [
+    "upstream_router.go",
+    "OpenRouter client"
+  ]
 }

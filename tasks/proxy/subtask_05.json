@@ -1,17 +1,21 @@
 {
   "id": "proxy-05",
   "seq": "05",
-  "title": "Implement fallback: if specialist response invalid → retry with upstream",
-  "status": "pending",
-  "depends_on": ["04"],
+  "title": "Implement fallback: if specialist response invalid \u2192 retry with upstream",
+  "status": "completed",
+  "depends_on": [
+    "04"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
   "reference_files": [],
   "acceptance_criteria": [
     "Checks specialist response for schema validity",
-    "If schema mismatch → transparently retry with upstream provider",
+    "If schema mismatch \u2192 transparently retry with upstream provider",
     "Client receives valid response regardless of fallback"
   ],
-  "deliverables": ["fallback_handler.go"]
+  "deliverables": [
+    "fallback_handler.go"
+  ]
 }

@@ -2,16 +2,24 @@
   "id": "proxy-04",
   "seq": "04",
   "title": "Implement specialist route: matching requests to local vLLM server",
-  "status": "pending",
-  "depends_on": ["03"],
+  "status": "completed",
+  "depends_on": [
+    "03"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": ["validator registry endpoint", "serving vLLM endpoint"],
+  "reference_files": [
+    "validator registry endpoint",
+    "serving vLLM endpoint"
+  ],
   "acceptance_criteria": [
     "Matching request returns specialist response from local vLLM",
     "Response format matches OpenAI spec",
     "Can look up latest model from validator registry"
   ],
-  "deliverables": ["specialist_router.go", "vLLM client"]
+  "deliverables": [
+    "specialist_router.go",
+    "vLLM client"
+  ]
 }
