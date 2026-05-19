@@ -2,7 +2,7 @@
   "id": "dataset-builder-02",
   "seq": "02",
   "title": "Fetch records from Observer API for a pattern ID",
-  "status": "pending",
+  "status": "completed","completed_at": "2026-05-19T18:45:00.000Z","completion_summary": "HTTP client with since-based pagination. 5 tests: empty, single batch, pagination, observer error, bad JSON.",
   "depends_on": [],
   "parallel": true,
   "suggested_agent": "CoderAgent",
