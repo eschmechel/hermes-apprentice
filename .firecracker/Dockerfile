@@ -15,6 +15,12 @@ RUN curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/
 
 RUN /usr/local/bin/hermes --version
 
+# Install optional Hermes extras into the Hermes venv via uv.
+# python-telegram-bot is required for the messaging tool / cron --deliver telegram;
+# Hermes treats it as an optional dep, so installs only fail noisily at first use.
+RUN VIRTUAL_ENV=/usr/local/lib/hermes-agent/venv \
+    /root/.local/bin/uv pip install python-telegram-bot
+
 RUN mkdir -p /root/.hermes/skills
 
 ARG SSH_AUTHORIZED_KEY=""
