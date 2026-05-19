@@ -2,8 +2,10 @@
   "id": "telegram-05",
   "seq": "05",
   "title": "Wire train/details/skip reply handler: user reply triggers training or detail dump",
-  "status": "pending",
-  "depends_on": ["04"],
+  "status": "completed",
+  "depends_on": [
+    "04"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -13,5 +15,8 @@
     "Reply `train` triggers training pipeline",
     "Reply `skip` dismisses the candidate"
   ],
-  "deliverables": ["reply_handler.go or .py", "Telegram bot command integration"]
+  "deliverables": [
+    "reply_handler.go or .py",
+    "Telegram bot command integration"
+  ]
 }

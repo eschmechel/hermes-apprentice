@@ -2,16 +2,20 @@
   "id": "telegram-03",
   "seq": "03",
   "title": "Write weekly summary template with volume, cost, next candidate",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": true,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": ["instrumentation weekly summary format"],
+  "reference_files": [
+    "instrumentation weekly summary format"
+  ],
   "acceptance_criteria": [
     "Template: 'This week: N requests, N served locally, N escalated. Total saved: $X and Y seconds. Next candidate: PATTERN (Z examples).'",
     "Message has correct numbers from instrumentation data",
     "Templates are parameterized"
   ],
-  "deliverables": ["weekly_summary_template.md or .txt"]
+  "deliverables": [
+    "weekly_summary_template.md or .txt"
+  ]
 }

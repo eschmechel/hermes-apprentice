@@ -2,16 +2,20 @@
   "id": "telegram-02",
   "seq": "02",
   "title": "Write failure message template with honest score reporting",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": true,
   "suggested_agent": "CoderAgent",
   "context_files": [],
-  "reference_files": ["validator failure reports"],
+  "reference_files": [
+    "validator failure reports"
+  ],
   "acceptance_criteria": [
     "Template: 'Training for PATTERN failed — specialist only matched BIG_MODEL on SCORE%. Won't deploy.'",
     "Message is honest, provides scores",
     "Templates are parameterized with failure data"
   ],
-  "deliverables": ["failure_template.md or .txt"]
+  "deliverables": [
+    "failure_template.md or .txt"
+  ]
 }

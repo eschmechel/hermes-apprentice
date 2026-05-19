@@ -1,0 +1,30 @@
+[project]
+name = "apprentice-telegram"
+version = "0.1.0"
+description = "Apprentice Telegram glue: templates, outbox, reply polling for cron-driven delivery."
+requires-python = ">=3.10,<3.13"
+
+# python-telegram-bot is only needed for the reply-poller path (Telegram
+# getUpdates calls). Outgoing delivery rides Hermes' own cron --deliver
+# telegram mechanism, which already has python-telegram-bot installed in the
+# microVM image (see .firecracker/Dockerfile and notes/foundation-07/proof.md).
+# We keep it as a soft dep here so unit tests can run without the network.
+dependencies = []
+
+[project.optional-dependencies]
+replies = [
+    "httpx>=0.27",
+]
+
+[project.scripts]
+apprentice-telegram = "apprentice_telegram.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apprentice_telegram"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
