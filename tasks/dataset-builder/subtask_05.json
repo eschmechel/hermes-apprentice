@@ -2,7 +2,7 @@
   "id": "dataset-builder-05",
   "seq": "05",
   "title": "Fuzzy dedup on input text",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["03", "04"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -13,5 +13,8 @@
     "Keeps first occurrence of near-duplicates",
     "Configurable threshold"
   ],
-  "deliverables": ["internal/dedup/dedup.go", "internal/dedup/dedup_test.go"]
+  "deliverables": ["internal/dedup/dedup.go", "internal/dedup/dedup_test.go"],
+  "started_at": "2026-05-19T15:30:00.000Z",
+  "completed_at": "2026-05-19T15:45:00.000Z",
+  "completion_summary": "Filter() tokenizes input text into words, builds bigram shingle sets, computes Jaccard similarity. Greedy first-occurrence algorithm preserves earliest near-duplicate. 8 tests pass: empty, single, identical, different, near-dup, chain dedup, custom threshold, default."
 }

@@ -2,7 +2,7 @@
   "id": "dataset-builder-06",
   "seq": "06",
   "title": "Teacher augmentation via OpenRouter for small datasets",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["05"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -13,5 +13,8 @@
     "25 seed pairs become ~200 after augmentation",
     "Paraphrases preserve the output structure/schema"
   ],
-  "deliverables": ["internal/augment/augment.go", "internal/augment/augment_test.go"]
+  "deliverables": ["internal/augment/augment.go", "internal/augment/augment_test.go"],
+  "started_at": "2026-05-19T15:50:00.000Z",
+  "completed_at": "2026-05-19T16:05:00.000Z",
+  "completion_summary": "Augment expands datasets below MinTarget (200) via OpenRouter chat API. Generates lexically-varied input paraphrases; preserves OutputText verbatim. MaxParaphrases cap per record prevents runaway expansion. API failures are non-fatal per record. 7 tests pass: above-target skip, expansion, empty input error, max cap, API key required, API error resilience, output preservation."
 }
