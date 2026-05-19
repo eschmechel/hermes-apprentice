@@ -40,7 +40,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from . import baseline_io, failure_reporter, metrics, promotion_gate, registry
+from . import baseline_io, failure_reporter, metrics, promotion_gate, registry, skill_registrar
 from .logging import setup_logging
 from .test_runner import check_only as specialist_check_only
 
@@ -71,6 +71,24 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Override registry root (default: ~/.apprentice/registry).")
     p.add_argument("--failures-dir", default=None,
                    help="Override failures dir (default: ~/.apprentice/failures).")
+    p.add_argument("--skip-skill-registration", action="store_true",
+                   help="Don't render/stage/push a Hermes SKILL.md after promotion.")
+    p.add_argument("--skill-staging-root", default=None,
+                   help="Override skill staging root (default: ~/.apprentice/skills).")
+    p.add_argument("--patterns-root", default=None,
+                   help="Override patterns root (default: ~/.apprentice/patterns). "
+                        "Used to read the pattern description for the SKILL.md.")
+    p.add_argument("--pattern-description", default=None,
+                   help="Override pattern description for the SKILL.md. Takes "
+                        "precedence over <patterns-root>/<pattern-id>/manifest.json.")
+    p.add_argument("--hermes-guest", default=skill_registrar.DEFAULT_GUEST_HOST,
+                   help=f"SSH target for Hermes microVM (default: "
+                        f"{skill_registrar.DEFAULT_GUEST_HOST}). Empty string skips "
+                        f"the guest push and only stages locally.")
+    p.add_argument("--hermes-guest-skills-dir",
+                   default=skill_registrar.DEFAULT_GUEST_SKILLS_DIR,
+                   help=f"Skills dir on the Hermes guest (default: "
+                        f"{skill_registrar.DEFAULT_GUEST_SKILLS_DIR}).")
     p.add_argument("--check-only", action="store_true",
                    help="Validate args + dataset without running inference.")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -177,6 +195,28 @@ def run_validate(args: argparse.Namespace) -> int:
             result["promotion_error"] = str(e)
             _print_result(result)
             return 4
+
+        if not args.skip_skill_registration:
+            try:
+                reg_result = skill_registrar.register_skill(
+                    pattern_id=pattern_id,
+                    description=args.pattern_description,
+                    patterns_root=(
+                        Path(args.patterns_root).expanduser().resolve()
+                        if args.patterns_root else None
+                    ),
+                    staging_root=(
+                        Path(args.skill_staging_root).expanduser().resolve()
+                        if args.skill_staging_root else None
+                    ),
+                    guest_host=(args.hermes_guest or None),
+                    guest_skills_dir=args.hermes_guest_skills_dir,
+                )
+                result["skill_registration"] = reg_result.as_dict()
+            except (ValueError, OSError) as e:
+                LOG.warning("skill registration failed (promotion stands)",
+                            extra={"error": str(e)})
+                result["skill_registration_error"] = str(e)
     else:
         failures_root = Path(args.failures_dir) if args.failures_dir else None
         try:

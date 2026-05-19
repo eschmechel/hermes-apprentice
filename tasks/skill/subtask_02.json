@@ -2,8 +2,10 @@
   "id": "skill-02",
   "seq": "02",
   "title": "Craft trigger description so LLM matches specialist-worthy requests",
-  "status": "pending",
-  "depends_on": ["01"],
+  "status": "completed",
+  "depends_on": [
+    "01"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -13,5 +15,7 @@
     "Trigger phrasing optimized for semantic similarity matching",
     "Tested with Hermes skill selection"
   ],
-  "deliverables": ["updated SKILL.md with trigger section"]
+  "deliverables": [
+    "updated SKILL.md with trigger section"
+  ]
 }

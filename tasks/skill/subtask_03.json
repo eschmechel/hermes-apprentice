@@ -2,8 +2,10 @@
   "id": "skill-03",
   "seq": "03",
   "title": "Skill body instructs agent: routing handled by proxy — respond normally",
-  "status": "pending",
-  "depends_on": ["02"],
+  "status": "completed",
+  "depends_on": [
+    "02"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -13,5 +15,7 @@
     "Skill body explains proxy routing is transparent",
     "Agent knows to respond with the specialist model output"
   ],
-  "deliverables": ["updated SKILL.md with body instructions"]
+  "deliverables": [
+    "updated SKILL.md with body instructions"
+  ]
 }

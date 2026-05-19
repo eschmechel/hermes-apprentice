@@ -2,8 +2,10 @@
   "id": "skill-05",
   "seq": "05",
   "title": "Implement /reload-skills call or next-session pickup",
-  "status": "pending",
-  "depends_on": ["04"],
+  "status": "completed",
+  "depends_on": [
+    "04"
+  ],
   "parallel": false,
   "suggested_agent": "CoderAgent",
   "context_files": [],
@@ -12,5 +14,8 @@
     "Hermes detects new skill without manual intervention",
     "Either /reload-skills endpoint works or next session picks it up"
   ],
-  "deliverables": ["skill_reloader.go or script", "reload mechanism documentation"]
+  "deliverables": [
+    "skill_reloader.go or script",
+    "reload mechanism documentation"
+  ]
 }
