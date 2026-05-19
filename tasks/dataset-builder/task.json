@@ -9,6 +9,6 @@
     "Given a pattern ID, produces train/val/test JSONL.gz with PII redacted and quality-filtered"
   ],
   "subtask_count": 8,
-  "completed_count": 6,
+  "completed_count": 7,
   "created_at": "2026-05-17T10:00:00.000Z"
 }

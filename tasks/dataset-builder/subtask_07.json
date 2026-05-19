@@ -2,7 +2,7 @@
   "id": "dataset-builder-07",
   "seq": "07",
   "title": "Split 80/10/10 + Hermes chat template JSONL.gz",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["06"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -13,5 +13,8 @@
     "Files are valid gzipped JSONL with role/content structure",
     "Hermes chat template: system prompt + user input + assistant output"
   ],
-  "deliverables": ["internal/splitter/splitter.go", "internal/splitter/splitter_test.go"]
+  "deliverables": ["internal/splitter/splitter.go", "internal/splitter/splitter_test.go"],
+  "started_at": "2026-05-19T16:10:00.000Z",
+  "completed_at": "2026-05-19T16:25:00.000Z",
+  "completion_summary": "Split deterministically shuffles records (configurable seed) and partitions 80/10/10. Write serialises to gzipped Hermes JSONL (system+user+assistant messages per line). WriteSplits handles full flow. Small-N boundary clamping ensures correctness at edges. 7 tests pass."
 }
