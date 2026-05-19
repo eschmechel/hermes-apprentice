@@ -552,3 +552,85 @@ func TestProxy_EmbedderErrorPassesThrough(t *testing.T) {
 		t.Fatalf("expected upstream fallback, got upHits=%d", upHits)
 	}
 }
+
+// Prometheus /metrics endpoint exposes registered counters.
+func TestMetricsEndpoint(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, openAIChatResponse("from upstream"))
+	}))
+	defer upstream.Close()
+
+	m := NewMetrics()
+	ts, _ := newTestServer(t, Config{
+		UpstreamURL:    upstream.URL,
+		PatternStore:   openStore(t),
+		LatencyTracker: NewLatencyTracker(),
+		Metrics:        m,
+	})
+
+	_, err := http.Post(ts.URL+"/v1/chat/completions", "application/json",
+		bytes.NewReader(openAIChatRequest(t, "metrics test")))
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+
+	resp, err := http.Get(ts.URL + "/metrics")
+	if err != nil {
+		t.Fatalf("GET /metrics: %v", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	bodyStr := string(body)
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("/metrics status=%d body=%s", resp.StatusCode, bodyStr)
+	}
+
+	wantMetrics := []string{
+		"apprentice_proxy_requests_total",
+		"apprentice_proxy_latency_seconds",
+		"apprentice_proxy_cost_usd_total",
+	}
+	for _, name := range wantMetrics {
+		if !strings.Contains(bodyStr, name) {
+			t.Errorf("/metrics missing %q", name)
+		}
+	}
+}
+
+// Stats endpoint returns p50/p99 for specialist and upstream.
+func TestStatsEndpoint(t *testing.T) {
+	var upHits int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&upHits, 1)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprint(w, openAIChatResponse("from upstream"))
+	}))
+	defer upstream.Close()
+
+	tracker := NewLatencyTracker()
+	ts, _ := newTestServer(t, Config{
+		UpstreamURL:    upstream.URL,
+		PatternStore:   openStore(t),
+		LatencyTracker: tracker,
+	})
+
+	resp, err := http.Get(ts.URL + "/stats")
+	if err != nil {
+		t.Fatalf("GET /stats: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("/stats status=%d", resp.StatusCode)
+	}
+	var stats map[string]float64
+	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
+		t.Fatalf("decode stats: %v", err)
+	}
+	if stats["status"] != 1 {
+		t.Errorf("expected status=1, got %f", stats["status"])
+	}
+}

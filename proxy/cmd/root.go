@@ -23,5 +23,6 @@ Hermes profile:
 	}
 	root.AddCommand(serveCmd())
 	root.AddCommand(versionCmd())
+	root.AddCommand(summaryCmd())
 	return root
 }

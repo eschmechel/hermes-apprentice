@@ -2,7 +2,7 @@
   "id": "instrumentation-03",
   "seq": "03",
   "title": "Write weekly summary generator: read 7-day logs, produce per-pattern report",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01", "02"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

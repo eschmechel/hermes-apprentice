@@ -1,14 +1,16 @@
 // Package httpapi implements the Apprentice Proxy HTTP server.  The proxy
 // exposes:
 //
-//   GET  /healthz                  liveness check
-//   POST /v1/chat/completions      OpenAI-compatible chat-completions endpoint
-//                                   that routes to a specialist when the last
-//                                   user message embeds close to a registered
-//                                   pattern, and otherwise proxies to upstream.
-//   POST /patterns                 register or replace a pattern (called by
-//                                   the detector after operator approval).
-//   GET  /patterns                 list registered patterns.
+//	GET  /healthz                  liveness check
+//	GET  /stats                    latency percentiles (p50/p99)
+//	GET  /metrics                  Prometheus metrics
+//	POST /v1/chat/completions      OpenAI-compatible chat-completions endpoint
+//	                                that routes to a specialist when the last
+//	                                user message embeds close to a registered
+//	                                pattern, and otherwise proxies to upstream.
+//	POST /patterns                 register or replace a pattern (called by
+//	                                the detector after operator approval).
+//	GET  /patterns                 list registered patterns.
 package httpapi
 
 import (
@@ -29,6 +31,12 @@ type Embedder interface {
 	Embed(text string) ([]float32, error)
 }
 
+// CostEstimator provides per-model cost estimates from token counts.
+// The proxy is unaware of pricing specifics — it only calls ComputeCost.
+type CostEstimator interface {
+	ComputeCost(model string, promptTokens, completionTokens int) float64
+}
+
 type Config struct {
 	Addr   string
 	Logger *slog.Logger
@@ -42,6 +50,18 @@ type Config struct {
 	// HTTPClient is optional; if nil, a default client with a long timeout is
 	// constructed.  Tests inject a client pointing at httptest.Server.
 	HTTPClient *http.Client
+
+	// LatencyTracker tracks p50/p99 for specialist vs upstream.
+	// When nil, latency stats and /stats endpoint are disabled.
+	LatencyTracker *LatencyTracker
+
+	// Pricing provides per-model cost estimates.  When nil, cost fields
+	// are omitted from request log lines.
+	Pricing CostEstimator
+
+	// Metrics provides an optional Prometheus metrics recorder.
+	// When nil, metrics are not recorded.
+	Metrics *Metrics
 }
 
 type Server struct {
@@ -66,12 +86,19 @@ func New(cfg Config) *Server {
 
 	mux.HandleFunc("GET /healthz", s.handleHealth)
 
+	stats := newStatsHandler(cfg.LatencyTracker)
+	mux.HandleFunc("GET /stats", stats.handleStats)
+
 	ph := newProxyHandler(cfg)
 	mux.HandleFunc("POST /v1/chat/completions", ph.handleChatCompletions)
 
 	pat := newPatternsHandler(cfg.PatternStore, cfg.Logger)
 	mux.HandleFunc("POST /patterns", pat.handleRegister)
 	mux.HandleFunc("GET /patterns", pat.handleList)
+
+	if cfg.Metrics != nil {
+		mux.HandleFunc("GET /metrics", cfg.Metrics.Handler().ServeHTTP)
+	}
 
 	s.srv = &http.Server{
 		Addr:              cfg.Addr,

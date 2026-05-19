@@ -25,8 +25,10 @@ type proxyHandler struct {
 	shadowRate     float64
 	logger         *slog.Logger
 
-	// rand is the source for shadow-sampling decisions.  Defaulting nil
-	// uses math/rand/v2's global source; tests can override.
+	latencyTracker *LatencyTracker
+	pricing        CostEstimator
+	metrics        *Metrics
+
 	rand func() float64
 }
 
@@ -39,19 +41,25 @@ func newProxyHandler(cfg Config) *proxyHandler {
 		matchThreshold: cfg.MatchThreshold,
 		shadowRate:     cfg.ShadowRate,
 		logger:         cfg.Logger,
+		latencyTracker: cfg.LatencyTracker,
+		pricing:        cfg.Pricing,
+		metrics:        cfg.Metrics,
 		rand:           rand.Float64,
 	}
 }
 
-// chatRequestPeek is the minimal slice of the OpenAI chat-completions request
-// we need to inspect for routing.  We use json.RawMessage for content because
-// OpenAI allows it to be either a string or an array of parts.
 type chatRequestPeek struct {
+	Model    string `json:"model"`
 	Messages []struct {
 		Role    string          `json:"role"`
 		Content json.RawMessage `json:"content"`
 	} `json:"messages"`
 	Stream bool `json:"stream"`
+}
+
+type chatResponseUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
 }
 
 func (h *proxyHandler) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -63,41 +71,32 @@ func (h *proxyHandler) handleChatCompletions(w http.ResponseWriter, r *http.Requ
 
 	peek, peekErr := peekChat(body)
 	if peekErr != nil {
-		// Forward malformed requests verbatim so upstream's error surface
-		// reaches the client — we don't claim to be a stricter validator
-		// than OpenAI.
-		h.forwardToUpstream(w, r, body, "peek_failed")
+		h.forwardToUpstream(w, r, body, "peek_failed", "", false)
 		return
 	}
 
 	lastUser := lastUserText(peek)
-	routed := h.tryRouteToSpecialist(w, r, body, peek, lastUser)
-	if routed {
-		return
+	routed, reason := h.tryRouteToSpecialist(w, r, body, peek, lastUser)
+	if !routed {
+		isFallback := strings.HasPrefix(reason, "specialist_")
+		h.forwardToUpstream(w, r, body, reason, peek.Model, isFallback)
 	}
-	h.forwardToUpstream(w, r, body, "no_match")
 }
 
-// tryRouteToSpecialist embeds the last user message, picks the best matching
-// pattern (if any), forwards to its specialist_url, and returns true when the
-// specialist served the response.  Returns false when no match, no embedder,
-// or the specialist failed and the caller should fall back to upstream.
-func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Request, body []byte, peek chatRequestPeek, lastUser string) bool {
+func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Request, body []byte, peek chatRequestPeek, lastUser string) (bool, string) {
 	if h.embedder == nil || h.store == nil || lastUser == "" {
-		return false
+		return false, "no_embedder_or_store"
 	}
 	emb, err := h.embedder.Embed(lastUser)
 	if err != nil {
 		h.logger.Warn("embed failed; falling back to upstream", "err", err)
-		return false
+		return false, "embed_failed"
 	}
 	match, ok := h.store.BestMatch(emb, h.matchThreshold)
 	if !ok {
-		return false
+		return false, "no_match"
 	}
 
-	// Shadow sample: launch upstream call concurrently for offline diff.
-	// Specialist response is still the one we return to the client.
 	var shadow *shadowJob
 	if h.shadowRate > 0 && h.rand() < h.shadowRate {
 		shadow = h.startShadow(r, body, match.Pattern.ID, hashInput(lastUser))
@@ -115,7 +114,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		if shadow != nil {
 			shadow.discard()
 		}
-		return false
+		return false, "specialist_error"
 	}
 
 	specBody, readErr := io.ReadAll(resp.Body)
@@ -126,7 +125,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		if shadow != nil {
 			shadow.discard()
 		}
-		return false
+		return false, "specialist_body_error"
 	}
 
 	if !specialistResponseOK(resp.StatusCode, specBody) {
@@ -137,10 +136,9 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		if shadow != nil {
 			shadow.discard()
 		}
-		return false
+		return false, "specialist_bad_response"
 	}
 
-	// Stream specialist response back to caller.
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
 	_, _ = w.Write(specBody)
@@ -151,31 +149,127 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		"latency_ms", specLatency.Milliseconds(),
 	)
 
+	if h.latencyTracker != nil {
+		h.latencyTracker.RecordSpecialist(specLatency)
+	}
+
+	promptTokens, completionTokens := extractUsage(specBody)
+	var costSavedUSD float64
+	if h.pricing != nil {
+		costSavedUSD = h.pricing.ComputeCost(peek.Model, promptTokens, completionTokens)
+	}
+
+	h.logRequest(peek.Model, "specialist", match.Pattern.ID, resp.StatusCode,
+		promptTokens, completionTokens, specLatency, 0, costSavedUSD)
+
+	if h.metrics != nil {
+		h.metrics.Observe("specialist", match.Pattern.ID, peek.Model, resp.StatusCode, specLatency, 0)
+	}
+
 	if shadow != nil {
 		go shadow.finish(specBody, specLatency)
 	}
-	return true
+	return true, "specialist"
 }
 
-// forwardToUpstream sends body to upstreamURL/chat/completions and streams the
-// response back to w.  reason is logged for observability.
-func (h *proxyHandler) forwardToUpstream(w http.ResponseWriter, r *http.Request, body []byte, reason string) {
+func (h *proxyHandler) forwardToUpstream(w http.ResponseWriter, r *http.Request, body []byte, reason string, model string, isFallback bool) {
+	start := time.Now()
 	resp, err := h.doRequest(r.Context(), r, body, h.upstreamURL+"/chat/completions")
+	var statusCode int
+	var promptTokens, completionTokens int
+	var costUSD float64
+
 	if err != nil {
 		h.logger.Warn("upstream call failed", "err", err, "reason", reason)
 		writeError(w, http.StatusBadGateway, "upstream call failed: "+err.Error())
+		statusCode = http.StatusBadGateway
+		if h.latencyTracker != nil {
+			h.latencyTracker.RecordUpstream(time.Since(start))
+		}
+		routeDecision := "upstream"
+		if isFallback {
+			routeDecision = "fallback"
+		}
+		h.logRequest(model, routeDecision, "", statusCode, 0, 0, time.Since(start), -1, 0)
+		if h.metrics != nil {
+			h.metrics.Observe(routeDecision, "", model, statusCode, time.Since(start), -1)
+		}
 		return
 	}
 	defer resp.Body.Close()
+	statusCode = resp.StatusCode
+
+	respBody, readErr := io.ReadAll(resp.Body)
+	if readErr != nil {
+		respBody = nil
+	}
+
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
-	h.logger.Info("upstream served request", "reason", reason, "status", resp.StatusCode)
+	if respBody != nil {
+		_, _ = w.Write(respBody)
+	}
+
+	latency := time.Since(start)
+
+	if h.latencyTracker != nil {
+		h.latencyTracker.RecordUpstream(latency)
+	}
+
+	promptTokens, completionTokens = extractUsage(respBody)
+
+	if h.pricing != nil {
+		costUSD = h.pricing.ComputeCost(model, promptTokens, completionTokens)
+	}
+
+	routeDecision := "upstream"
+	if isFallback {
+		routeDecision = "fallback"
+	}
+
+	h.logRequest(model, routeDecision, "", statusCode, promptTokens, completionTokens, latency, costUSD, 0)
+
+	if h.metrics != nil {
+		h.metrics.Observe(routeDecision, "", model, statusCode, latency, costUSD)
+	}
+
+	h.logger.Info("upstream served request", "reason", reason, "status", statusCode)
 }
 
-// doRequest builds an outbound POST mirroring the inbound request's body and
-// content headers, targeting destURL.  Hop-by-hop headers and Host are
-// stripped.
+func (h *proxyHandler) logRequest(model, routeDecision, patternID string, statusCode, promptTokens, completionTokens int, latency time.Duration, costUSD, costSavedUSD float64) {
+	args := []any{
+		"method", "POST",
+		"route_decision", routeDecision,
+		"model", model,
+		"status", statusCode,
+		"latency_ms", latency.Milliseconds(),
+	}
+	if patternID != "" {
+		args = append(args, "pattern_id", patternID)
+	}
+	args = append(args, "prompt_tokens", promptTokens)
+	args = append(args, "completion_tokens", completionTokens)
+	if costUSD >= 0 {
+		args = append(args, "estimated_cost_usd", costUSD)
+	}
+	args = append(args, "cost_saved_usd", costSavedUSD)
+
+	h.logger.Info("request", args...)
+}
+
+func extractUsage(body []byte) (promptTokens, completionTokens int) {
+	if body == nil {
+		return 0, 0
+	}
+	var peeked struct {
+		Usage *chatResponseUsage `json:"usage"`
+	}
+	if err := json.Unmarshal(body, &peeked); err != nil || peeked.Usage == nil {
+		return 0, 0
+	}
+	return peeked.Usage.PromptTokens, peeked.Usage.CompletionTokens
+}
+
 func (h *proxyHandler) doRequest(ctx context.Context, in *http.Request, body []byte, destURL string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, destURL, bytes.NewReader(body))
 	if err != nil {
@@ -195,11 +289,6 @@ func (h *proxyHandler) doRequest(ctx context.Context, in *http.Request, body []b
 	return h.client.Do(req)
 }
 
-// specialistResponseOK accepts a response only if it is HTTP 2xx and the JSON
-// body parses with a non-empty "choices" array (the OpenAI chat-completions
-// success shape).  Streamed responses (SSE) are accepted on status alone — we
-// don't parse a stream here; if the specialist is a real vLLM it almost
-// certainly speaks JSON on non-streaming calls.
 func specialistResponseOK(status int, body []byte) bool {
 	if status < 200 || status >= 300 {
 		return false
@@ -208,7 +297,6 @@ func specialistResponseOK(status int, body []byte) bool {
 	if len(trimmed) == 0 {
 		return false
 	}
-	// SSE / chunked stream — trust the status.
 	if !bytes.HasPrefix(trimmed, []byte("{")) {
 		return true
 	}
@@ -233,9 +321,6 @@ func peekChat(body []byte) (chatRequestPeek, error) {
 	return p, nil
 }
 
-// lastUserText returns the text content of the most recent user message, or
-// "" if none.  OpenAI allows content to be either a string or an array of
-// parts ([{type:"text", text:"..."}, ...]); both shapes are supported.
 func lastUserText(p chatRequestPeek) string {
 	for i := len(p.Messages) - 1; i >= 0; i-- {
 		m := p.Messages[i]
@@ -246,7 +331,6 @@ func lastUserText(p chatRequestPeek) string {
 		if len(raw) == 0 {
 			continue
 		}
-		// String form
 		if raw[0] == '"' {
 			var s string
 			if err := json.Unmarshal(raw, &s); err == nil {
@@ -254,7 +338,6 @@ func lastUserText(p chatRequestPeek) string {
 			}
 			continue
 		}
-		// Array of parts form
 		if raw[0] == '[' {
 			var parts []struct {
 				Type string `json:"type"`
@@ -313,10 +396,6 @@ func copyHeaders(dst http.Header, src http.Header) {
 	}
 }
 
-// shadowJob runs the upstream call for shadow comparison in parallel with the
-// specialist call.  finish() logs the diff once both have completed; discard()
-// cancels the upstream call when the specialist already failed and we'd never
-// want to compare.
 type shadowJob struct {
 	cancel    context.CancelFunc
 	done      chan struct{}
@@ -330,9 +409,6 @@ type shadowJob struct {
 }
 
 func (h *proxyHandler) startShadow(r *http.Request, body []byte, patternID, inputHash string) *shadowJob {
-	// Decouple from the request context so a fast specialist response that
-	// finishes the inbound request doesn't kill the shadow upstream call
-	// mid-flight.
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	job := &shadowJob{
 		cancel:    cancel,
@@ -385,7 +461,5 @@ func (j *shadowJob) finish(specialistBody []byte, specialistLatency time.Duratio
 
 func (j *shadowJob) discard() {
 	j.cancel()
-	// Drain the goroutine so it doesn't leak.
 	go func() { <-j.done }()
 }
-

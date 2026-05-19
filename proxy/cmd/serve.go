@@ -9,6 +9,7 @@ import (
 
 	ort "github.com/yalue/onnxruntime_go"
 
+	"github.com/hermes-apprentice/proxy/internal/cost"
 	"github.com/hermes-apprentice/proxy/internal/embedder"
 	"github.com/hermes-apprentice/proxy/internal/httpapi"
 	"github.com/hermes-apprentice/proxy/internal/patterns"
@@ -82,6 +83,18 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				defer emb.Close()
 			}
 
+			latencyTracker := httpapi.NewLatencyTracker()
+
+			pricing, loadErr := cost.LoadFile(
+				filepath.Join(stateDir, "pricing.json"),
+			)
+			if loadErr != nil {
+				logger.Warn("pricing config load failed; using defaults", "err", loadErr)
+				pricing = cost.New(nil)
+			}
+
+			metrics := httpapi.NewMetrics()
+
 			srv := httpapi.New(httpapi.Config{
 				Addr:           listenAddr,
 				Logger:         logger,
@@ -90,6 +103,9 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				PatternStore:   store,
 				MatchThreshold: float32(matchThreshold),
 				ShadowRate:     shadowRate,
+				LatencyTracker: latencyTracker,
+				Pricing:        pricing,
+				Metrics:        metrics,
 			})
 
 			return srv.ListenAndServe(ctx)
@@ -97,7 +113,7 @@ chat-completions schema, so request and response shapes are unchanged.`,
 	}
 	cmd.Flags().StringVar(&listenAddr, "listen", ":8083", "HTTP listen address")
 	cmd.Flags().StringVar(&upstreamURL, "upstream-url", "https://openrouter.ai/api/v1", "Upstream OpenAI-compatible base URL (used for fallback and non-matching requests)")
-	cmd.Flags().StringVar(&stateDir, "state-dir", os.ExpandEnv("$HOME/.apprentice/proxy"), "Proxy state directory (patterns.json)")
+	cmd.Flags().StringVar(&stateDir, "state-dir", os.ExpandEnv("$HOME/.apprentice/proxy"), "Proxy state directory (patterns.json, pricing.json)")
 	cmd.Flags().StringVar(&modelDir, "model-dir", os.ExpandEnv("$HOME/.apprentice/models/bge-small-onnx"), "Directory containing BGE-small ONNX model.onnx + vocab.json")
 	cmd.Flags().StringVar(&ortLibPath, "onnxruntime-lib", "/usr/lib/libonnxruntime.so", "Path to libonnxruntime.so (empty = use ORT default search)")
 	cmd.Flags().Float64Var(&matchThreshold, "match-threshold", 0.78, "Minimum cosine similarity to consider a pattern matched")

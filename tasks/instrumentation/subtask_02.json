@@ -2,7 +2,7 @@
   "id": "instrumentation-02",
   "seq": "02",
   "title": "Add cost tracking: per-request cost from OpenRouter token pricing",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": true,
   "suggested_agent": "CoderAgent",

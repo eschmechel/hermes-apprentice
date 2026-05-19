@@ -2,7 +2,7 @@
   "id": "instrumentation-01",
   "seq": "01",
   "title": "Add latency logging to proxy: per-request p50/p99 for specialist vs upstream",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": true,
   "suggested_agent": "CoderAgent",

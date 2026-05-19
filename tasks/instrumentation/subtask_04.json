@@ -2,7 +2,7 @@
   "id": "instrumentation-04",
   "seq": "04",
   "title": "Emit Prometheus counters if prometheus client library is available",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01", "02"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
