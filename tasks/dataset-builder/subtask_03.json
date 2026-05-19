@@ -2,7 +2,7 @@
   "id": "dataset-builder-03",
   "seq": "03",
   "title": "PII redaction via Presidio REST API",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -13,5 +13,8 @@
     "Presidio /analyze + /anonymize REST calls succeed",
     "Placeholder tokens are stable (same input → same replacement)"
   ],
-  "deliverables": ["internal/redactor/redactor.go", "internal/redactor/redactor_test.go"]
+  "deliverables": ["internal/redact/redact.go", "internal/redact/redact_test.go"],
+  "started_at": "2026-05-19T10:00:00.000Z",
+  "completed_at": "2026-05-19T15:00:00.000Z",
+  "completion_summary": "internal/redact: Presidio /analyze REST client, replaces PII spans with <ENTITY_TYPE> tags using byte-indexed span replacement. Redact() sends text to Presidio, sorts spans descending by Start, replaces in-place. 6 tests pass: empty text, no PII, single entity, multiple entities, Presidio error, overlapping spans."
 }

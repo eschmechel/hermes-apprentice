@@ -2,7 +2,7 @@
   "id": "dataset-builder-04",
   "seq": "04",
   "title": "Quality filter: drop re-ask/correction pairs",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["02"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -13,5 +13,8 @@
     "Drops pairs where user corrected output within 3 turns of same session",
     "Only unambiguous accepted pairs survive"
   ],
-  "deliverables": ["internal/quality/quality.go", "internal/quality/quality_test.go"]
+  "deliverables": ["internal/quality/quality.go", "internal/quality/quality_test.go"],
+  "started_at": "2026-05-19T10:00:00.000Z",
+  "completed_at": "2026-05-19T15:00:00.000Z",
+  "completion_summary": "internal/quality: Filter() drops pairs with re-ask output prefixes (30 patterns) and detects correction turns within 3-turn session window (20 patterns). Groups records by SessionID, sorts by CreatedAt, checks input for correction language against prior outputs. 8 tests pass: empty, good kept, re-ask dropped, correction dropped, session isolation."
 }
