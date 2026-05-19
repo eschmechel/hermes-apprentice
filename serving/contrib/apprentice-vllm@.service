@@ -1,0 +1,23 @@
+[Unit]
+Description=Apprentice vLLM serving for pattern %i
+After=network-online.target registry-service.service
+Wants=network-online.target
+Requires=registry-service.service
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/apprentice-serve --check-only --pattern-id %i
+ExecStart=/usr/bin/apprentice-serve --pattern-id %i
+Restart=on-failure
+RestartSec=10
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/apprentice/registry
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target
