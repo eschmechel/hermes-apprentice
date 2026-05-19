@@ -1,12 +1,14 @@
 package cmd
 
 import (
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
+	"github.com/hermes-apprentice/detector/internal/httpapi"
+	"github.com/hermes-apprentice/detector/internal/patternstore"
 	"github.com/spf13/cobra"
 )
 
@@ -30,12 +32,21 @@ func serveCmd() *cobra.Command {
 				"freshness_hours", freshnessHours,
 				"version", Version,
 			)
-			_, stop := signal.NotifyContext(c.Context(), syscall.SIGINT, syscall.SIGTERM)
+			ctx, stop := signal.NotifyContext(c.Context(), syscall.SIGINT, syscall.SIGTERM)
 			defer stop()
 
-			// Pipeline wiring lands in later subtasks. For now `serve` is a
-			// no-op shell that proves the scaffold parses flags and exits clean.
-			return fmt.Errorf("detector serve is not yet wired (see detector-01..06)")
+			ps, err := patternstore.Open(filepath.Join(stateDir, "patterns"))
+			if err != nil {
+				return err
+			}
+
+			srv := httpapi.New(httpapi.Config{
+				Addr:         listenAddr,
+				Logger:       logger,
+				PatternStore: ps,
+			})
+
+			return srv.ListenAndServe(ctx)
 		},
 	}
 	cmd.Flags().StringVar(&listenAddr, "listen", ":8081", "HTTP listen address")
