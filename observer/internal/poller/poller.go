@@ -108,7 +108,7 @@ func (p *Poller) Run(ctx context.Context) error {
 
 func (p *Poller) drain(ctx context.Context, db *sql.DB, sinceID int64) (int, int64, error) {
 	const q = `
-SELECT id, session_id, role, content, timestamp, tool_calls, tool_name
+SELECT id, session_id, role, content, timestamp, tool_calls, tool_name, token_count
 FROM messages
 WHERE id > ?
 ORDER BY id ASC`
@@ -122,7 +122,7 @@ ORDER BY id ASC`
 	high := sinceID
 	for rows.Next() {
 		var m Message
-		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Content, &m.Timestamp, &m.ToolCalls, &m.ToolName); err != nil {
+		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Content, &m.Timestamp, &m.ToolCalls, &m.ToolName, &m.TokenCount); err != nil {
 			return count, high, fmt.Errorf("scan: %w", err)
 		}
 		if p.cfg.Handler != nil {

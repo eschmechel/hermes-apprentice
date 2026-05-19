@@ -16,4 +16,5 @@ type Message struct {
 	Timestamp  float64
 	ToolCalls  sql.NullString
 	ToolName   sql.NullString
+	TokenCount sql.NullInt64 // messages.token_count (per-message, nullable)
 }

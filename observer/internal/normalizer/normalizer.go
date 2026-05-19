@@ -23,6 +23,8 @@ type Normalized struct {
 	ToolName    string
 	Timestamp   float64
 	ContentHash string // sha256 of normalized content (lowercase hex)
+	TokenCount  int64  // 0 if Hermes hadn't recorded a count for this row
+	HasTokens   bool   // distinguishes "unknown" from "zero"
 }
 
 // Normalize collapses NULLs, trims surrounding whitespace, and computes a
@@ -53,6 +55,14 @@ func Normalize(m poller.Message) Normalized {
 	h.Write([]byte(content))
 	h.Write([]byte{0})
 	h.Write([]byte(toolCalls))
+
+	var tokens int64
+	hasTokens := false
+	if m.TokenCount.Valid {
+		tokens = m.TokenCount.Int64
+		hasTokens = true
+	}
+
 	return Normalized{
 		ID:          m.ID,
 		SessionID:   m.SessionID,
@@ -62,5 +72,7 @@ func Normalize(m poller.Message) Normalized {
 		ToolName:    toolName,
 		Timestamp:   m.Timestamp,
 		ContentHash: hex.EncodeToString(h.Sum(nil)),
+		TokenCount:  tokens,
+		HasTokens:   hasTokens,
 	}
 }

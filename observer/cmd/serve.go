@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,9 +14,12 @@ import (
 	"github.com/hermes-apprentice/observer/internal/dedup"
 	"github.com/hermes-apprentice/observer/internal/httpapi"
 	"github.com/hermes-apprentice/observer/internal/normalizer"
+	"github.com/hermes-apprentice/observer/internal/pairing"
 	"github.com/hermes-apprentice/observer/internal/poller"
 	"github.com/hermes-apprentice/observer/internal/state"
+	"github.com/hermes-apprentice/observer/internal/store"
 	"github.com/spf13/cobra"
+	_ "modernc.org/sqlite"
 )
 
 func serveCmd() *cobra.Command {
@@ -55,6 +59,25 @@ func serveCmd() *cobra.Command {
 
 			window := dedup.New(dedupWindow, nil)
 
+			// Observer's own SQLite store for (input, output) records.
+			obsStore, err := store.Open(observerDB)
+			if err != nil {
+				return fmt.Errorf("open observer store: %w", err)
+			}
+			defer obsStore.Close()
+
+			// Read-only connection to Hermes DB for sessions enrichment (model,
+			// system_prompt). Separate from the poller's connection so query
+			// contention is bounded by SQLite WAL, not driver mutex.
+			hermesEnrichDSN := fmt.Sprintf("file:%s?mode=ro&_journal_mode=WAL", hermesDBPath)
+			hermesEnrich, err := sql.Open("sqlite", hermesEnrichDSN)
+			if err != nil {
+				return fmt.Errorf("open hermes for enrichment: %w", err)
+			}
+			defer hermesEnrich.Close()
+
+			pairer := pairing.New(obsStore, hermesEnrich, logger.With("component", "pairer"))
+
 			srv := httpapi.New(httpapi.Config{
 				Addr:   listenAddr,
 				Logger: logger,
@@ -69,7 +92,6 @@ func serveCmd() *cobra.Command {
 						"role", n.Role,
 						"content_hash", n.ContentHash[:12],
 					)
-					// Still advance HWM — we observed this message, just chose to drop it.
 					return hwm.Set(m.ID)
 				}
 				logger.Info("hermes message",
@@ -81,7 +103,9 @@ func serveCmd() *cobra.Command {
 					"content_hash", n.ContentHash[:12],
 					"ts", n.Timestamp,
 				)
-				// TODO observer-04: persist normalized record to the local SQLite store.
+				if err := pairer.Observe(ctx, n); err != nil {
+					return fmt.Errorf("pairer: %w", err)
+				}
 				return hwm.Set(m.ID)
 			}
 
