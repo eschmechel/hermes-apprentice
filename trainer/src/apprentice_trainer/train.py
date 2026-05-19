@@ -239,26 +239,46 @@ def run_training(args: argparse.Namespace) -> int:
     )
 
     # ---- train + save ----------------------------------------------------
+    # The training+manifest block is wrapped so a crash mid-train still leaves
+    # a manifest describing what was attempted. The validator milestone treats
+    # exit_code != 0 as "do not promote", so the manifest must be written even
+    # on failure.
+    from . import manifest_writer
+
     t0 = time.time()
     LOG.info("training begins")
-    stats = trainer.train()
-    train_time = time.time() - t0
+    exit_code = 0
+    try:
+        stats = trainer.train()
+        train_time = time.time() - t0
+        LOG.info(
+            "training complete",
+            extra={
+                "wallclock_seconds": round(train_time, 1),
+                "train_runtime_seconds": getattr(stats.metrics, "get", lambda *_: None)("train_runtime"),
+                "train_loss": getattr(stats.metrics, "get", lambda *_: None)("train_loss"),
+                "steps": stats.global_step,
+            },
+        )
+        adapter_dir.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(str(adapter_dir))
+        tokenizer.save_pretrained(str(adapter_dir))
+        LOG.info("lora adapter saved", extra={"path": str(adapter_dir)})
+    except Exception:
+        train_time = time.time() - t0
+        exit_code = 1
+        LOG.exception("training raised")
 
-    LOG.info(
-        "training complete",
-        extra={
-            "wallclock_seconds": round(train_time, 1),
-            "train_runtime_seconds": getattr(stats.metrics, "get", lambda *_: None)("train_runtime"),
-            "train_loss": getattr(stats.metrics, "get", lambda *_: None)("train_loss"),
-            "steps": stats.global_step,
-        },
+    manifest = manifest_writer.build_manifest(
+        dataset_dir=dataset_dir,
+        base_model=args.base_model,
+        hyperparameters=manifest_writer.collect_hyperparameters(args),
+        runtime_seconds=train_time,
+        exit_code=exit_code,
+        extra={"adapter_dir": str(adapter_dir) if exit_code == 0 else None},
     )
-
-    adapter_dir.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(str(adapter_dir))
-    tokenizer.save_pretrained(str(adapter_dir))
-    LOG.info("lora adapter saved", extra={"path": str(adapter_dir)})
-    return 0
+    manifest_writer.write_manifest(output_dir, manifest)
+    return exit_code
 
 
 # ---------------------------------------------------------------------------

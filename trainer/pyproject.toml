@@ -12,11 +12,13 @@ dependencies = [
     "datasets>=2.20",
     "pyyaml>=6.0",
     "huggingface-hub>=0.24",
+    "cryptography>=42",
 ]
 
 [project.scripts]
 apprentice-train = "apprentice_trainer.train:main"
 apprentice-merge = "apprentice_trainer.model_exporter:main"
+apprentice-sign = "apprentice_trainer.manifest_signer:main"
 
 [build-system]
 requires = ["hatchling"]
