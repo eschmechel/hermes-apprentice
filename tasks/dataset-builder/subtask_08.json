@@ -2,7 +2,7 @@
   "id": "dataset-builder-08",
   "seq": "08",
   "title": "Versioned save + manifest + prune",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["07"],
   "parallel": false,
   "suggested_agent": "CoderAgent",
@@ -14,5 +14,8 @@
     "Decompress subcommand reads .gz files back to plain JSONL",
     "Prune-keep and prune-older-than flags remove old versions"
   ],
-  "deliverables": ["internal/versioned/versioned.go", "internal/versioned/versioned_test.go"]
+  "deliverables": ["internal/versioned/versioned.go", "internal/versioned/versioned_test.go"],
+  "started_at": "2026-05-19T16:30:00.000Z",
+  "completed_at": "2026-05-19T16:50:00.000Z",
+  "completion_summary": "Save writes versioned splits with auto-increment and manifest (SHA-256, row counts). Load reads manifest. PruneKeep/PruneOlderThan remove versions. Decompress handles .gz→.jsonl. Full build pipeline wired. 9 tests pass."
 }
