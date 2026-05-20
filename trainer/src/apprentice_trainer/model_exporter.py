@@ -62,6 +62,16 @@ def validate_adapter_dir(adapter_dir: Path) -> dict:
         return json.load(f)
 
 
+def _normalize_base(name: str) -> str:
+    """Normalize a base-model id for comparison: drop the quantization suffixes
+    so Unsloth's fp16 and -bnb-4bit variants of the same model compare equal."""
+    n = name.strip().rstrip("/")
+    for suffix in ("-unsloth-bnb-4bit", "-bnb-4bit"):
+        if n.endswith(suffix):
+            n = n[: -len(suffix)]
+    return n.lower()
+
+
 def merge_and_export(
     *,
     base_model: str,
@@ -95,10 +105,21 @@ def merge_and_export(
         extra={"base_model": base_model, "adapter_dir": str(adapter_dir),
                "max_seq_len": max_seq_len},
     )
-    # FastLanguageModel.from_pretrained takes either the base model id or the
-    # adapter dir; pointing it at the adapter dir loads base + adapter in one
-    # shot. We pass the explicit base_model so the merge target is deterministic
-    # even if adapter_config.json's base_model_name_or_path is stale.
+    # A LoRA adapter can only be merged onto the exact base it was trained
+    # against, which is recorded in adapter_config.json's
+    # base_model_name_or_path. So we load from the adapter dir — Unsloth
+    # resolves base + adapter (and maps -bnb-4bit -> fp16) in one shot. The
+    # --base-model argument is a sanity check, not an override: warn if it
+    # disagrees with the recorded base rather than silently merging onto the
+    # wrong weights.
+    recorded_base = validate_adapter_dir(adapter_dir).get("base_model_name_or_path")
+    if base_model and recorded_base and _normalize_base(base_model) != _normalize_base(recorded_base):
+        LOG.warning(
+            "requested --base-model disagrees with the adapter's recorded base; "
+            "using the recorded base (the adapter cannot merge onto a different base)",
+            extra={"requested_base_model": base_model, "adapter_base": recorded_base},
+        )
+
     model, tokenizer = FastLanguageModel.from_pretrained(
         model_name=str(adapter_dir),
         max_seq_length=max_seq_len,
@@ -125,7 +146,9 @@ def build_parser() -> argparse.ArgumentParser:
         description="Merge a LoRA adapter back into its base model and save as merged_16bit.",
     )
     p.add_argument("--base-model", required=True,
-                   help="HF model id for the base (must match the trainer's --base-model).")
+                   help="HF model id of the base the adapter was trained on. The "
+                        "actual base is read from the adapter's adapter_config.json; "
+                        "this value is validated against it (a mismatch only warns).")
     p.add_argument("--adapter-dir", required=True,
                    help="Path to the LoRA adapter dir produced by apprentice-train "
                         "(usually <output>/lora-adapter).")
