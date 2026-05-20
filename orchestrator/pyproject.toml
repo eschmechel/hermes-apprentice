@@ -1,0 +1,31 @@
+[project]
+name = "apprentice-orchestrator"
+version = "0.1.0"
+description = "Apprentice orchestrator: consume training approvals and drive dataset-builder -> train -> merge -> validate -> promote across the train/serve venvs."
+requires-python = ">=3.10,<3.13"
+
+# correlation_id (cid<->pattern) and the failure-notification path come from
+# apprentice-telegram; co-install it editable (uv pip install -e ./telegram).
+dependencies = [
+    "apprentice-telegram",
+]
+
+[project.optional-dependencies]
+# The conversational dispatcher surface (Hermes calls these tools).
+mcp = [
+    "mcp>=1.2",
+]
+
+[project.scripts]
+apprentice-orchestrator = "apprentice_orchestrator.cli:main"
+apprentice-orchestrator-mcp = "apprentice_orchestrator.mcp_server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/apprentice_orchestrator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
