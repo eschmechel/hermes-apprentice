@@ -127,10 +127,13 @@ def run_training(args: argparse.Namespace) -> int:
         return 3
 
     try:
-        from datasets import Dataset
-        from trl import SFTTrainer, SFTConfig
+        # Unsloth MUST be imported before trl/transformers/peft so its
+        # optimizations are applied — otherwise LoRA params are not marked
+        # trainable ("Trainable parameters = 0") and training raises at step 0.
         from unsloth import FastLanguageModel
         from unsloth.chat_templates import get_chat_template
+        from trl import SFTTrainer, SFTConfig
+        from datasets import Dataset
     except ImportError as e:
         LOG.error("missing training dep: %s. See trainer/README.md for the install command.", e)
         return 2
