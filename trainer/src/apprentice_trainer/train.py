@@ -172,8 +172,16 @@ def run_training(args: argparse.Namespace) -> int:
         load_in_4bit=args.load_in_4bit,
     )
 
+    # Capture the genuine EOS before templating: Unsloth's get_chat_template
+    # can leave the literal placeholder "<EOS_TOKEN>" as tokenizer.eos_token,
+    # which TRL 0.24's SFTTrainer rejects ("eos_token not found in the
+    # vocabulary"). Restore the real token if that happens.
+    real_eos_token = tokenizer.eos_token
+
     # Qwen2.5 uses ChatML; Unsloth's preset names this template "qwen-2.5".
     tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
+    if tokenizer.eos_token is None or tokenizer.eos_token not in tokenizer.get_vocab():
+        tokenizer.eos_token = real_eos_token
 
     # ---- LoRA -----------------------------------------------------------
     model = FastLanguageModel.get_peft_model(
