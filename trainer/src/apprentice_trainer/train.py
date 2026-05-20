@@ -172,16 +172,8 @@ def run_training(args: argparse.Namespace) -> int:
         load_in_4bit=args.load_in_4bit,
     )
 
-    # Capture the genuine EOS before templating: Unsloth's get_chat_template
-    # can leave the literal placeholder "<EOS_TOKEN>" as tokenizer.eos_token,
-    # which TRL 0.24's SFTTrainer rejects ("eos_token not found in the
-    # vocabulary"). Restore the real token if that happens.
-    real_eos_token = tokenizer.eos_token
-
     # Qwen2.5 uses ChatML; Unsloth's preset names this template "qwen-2.5".
     tokenizer = get_chat_template(tokenizer, chat_template="qwen-2.5")
-    if tokenizer.eos_token is None or tokenizer.eos_token not in tokenizer.get_vocab():
-        tokenizer.eos_token = real_eos_token
 
     # ---- LoRA -----------------------------------------------------------
     model = FastLanguageModel.get_peft_model(
@@ -240,6 +232,25 @@ def run_training(args: argparse.Namespace) -> int:
         dataset_num_proc=2,
         packing=False,
     )
+
+    # unsloth_zoo's generated SFTTrainer injects the unresolved placeholders
+    # "<EOS_TOKEN>" / "<PAD_TOKEN>" as the trainer's eos/pad tokens; TRL then
+    # rejects them because convert_tokens_to_ids() can't find those literals in
+    # the vocab. Map the placeholders to the real special tokens so validation
+    # passes. This only affects the id lookup — TRL uses the real
+    # tokenizer.eos_token string for actual sequence handling.
+    _placeholder_tokens = {
+        "<EOS_TOKEN>": tokenizer.eos_token,
+        "<PAD_TOKEN>": tokenizer.pad_token or tokenizer.eos_token,
+    }
+    _orig_convert = tokenizer.convert_tokens_to_ids
+
+    def _convert_tokens_to_ids(tokens, *a, **kw):
+        if isinstance(tokens, str) and tokens in _placeholder_tokens:
+            tokens = _placeholder_tokens[tokens]
+        return _orig_convert(tokens, *a, **kw)
+
+    tokenizer.convert_tokens_to_ids = _convert_tokens_to_ids
 
     trainer = SFTTrainer(
         model=model,
