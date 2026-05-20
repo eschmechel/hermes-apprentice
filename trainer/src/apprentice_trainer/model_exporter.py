@@ -29,6 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -41,6 +42,9 @@ LOG = logging.getLogger("apprentice_trainer.exporter")
 # to confirm we're pointing at a real LoRA adapter dir, not a random folder.
 _ADAPTER_CONFIG = "adapter_config.json"
 _ADAPTER_WEIGHTS_CANDIDATES = ("adapter_model.safetensors", "adapter_model.bin")
+# The trainer writes the (signed) training manifest next to the adapter; the
+# merge carries it into the merged dir so the validator can verify + promote.
+_TRAINING_MANIFEST = "training_manifest.json"
 
 
 def validate_adapter_dir(adapter_dir: Path) -> dict:
@@ -133,6 +137,22 @@ def merge_and_export(
     model.save_pretrained_merged(str(output_dir), tokenizer, save_method=save_method)
     LOG.info("merge complete", extra={"wallclock_seconds": round(time.time() - t0, 1),
                                        "output_dir": str(output_dir)})
+
+    # Carry the (signed) training manifest into the merged dir so the validator
+    # can verify provenance and promote. The trainer writes it next to the
+    # adapter, i.e. in adapter_dir's parent.
+    manifest_src_dir = adapter_dir.parent
+    for name in (_TRAINING_MANIFEST, f"{_TRAINING_MANIFEST}.sig"):
+        src = manifest_src_dir / name
+        if src.exists():
+            shutil.copy2(src, output_dir / name)
+            LOG.info("copied training manifest into merged dir", extra={"file": name})
+        elif name == _TRAINING_MANIFEST:
+            LOG.warning(
+                "training manifest not found next to adapter; the validator will "
+                "refuse to promote without it (run apprentice-sign sign on it first)",
+                extra={"expected": str(src)},
+            )
     return output_dir
 
 
