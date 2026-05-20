@@ -128,8 +128,7 @@ def run_training(args: argparse.Namespace) -> int:
 
     try:
         from datasets import Dataset
-        from trl import SFTTrainer
-        from transformers import TrainingArguments
+        from trl import SFTTrainer, SFTConfig
         from unsloth import FastLanguageModel
         from unsloth.chat_templates import get_chat_template
     except ImportError as e:
@@ -209,7 +208,10 @@ def run_training(args: argparse.Namespace) -> int:
 
     # ---- trainer ---------------------------------------------------------
     bf16_supported = torch.cuda.is_bf16_supported()
-    training_args = TrainingArguments(
+    # TRL 0.24 moved the SFT-specific knobs (dataset_text_field, max_length,
+    # dataset_num_proc, packing) onto SFTConfig, and renamed SFTTrainer's
+    # `tokenizer` kwarg to `processing_class`.
+    training_args = SFTConfig(
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         warmup_steps=args.warmup_steps,
@@ -225,16 +227,16 @@ def run_training(args: argparse.Namespace) -> int:
         output_dir=str(output_dir / "checkpoints"),
         report_to="none",
         save_strategy="no",  # we save the final LoRA explicitly below
+        dataset_text_field="text",
+        max_length=args.max_seq_len,
+        dataset_num_proc=2,
+        packing=False,
     )
 
     trainer = SFTTrainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=train_ds,
-        dataset_text_field="text",
-        max_seq_length=args.max_seq_len,
-        dataset_num_proc=2,
-        packing=False,
         args=training_args,
     )
 
