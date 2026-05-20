@@ -108,11 +108,14 @@ fi
 sleep 10
 
 if kill -0 $FC_PID 2>/dev/null; then
-    echo "=== VM IS RUNNING ==="
-    echo "Guest reachable at: ssh root@${GUEST_IP}"
     echo "=== Console output: ==="
     cat /tmp/firecracker.log
-    echo "=== End ==="
+    echo "=== End console output ==="
+    echo
+    # Print the actionable summary LAST so it isn't buried above the serial
+    # console dump (which ends at the guest's autologin prompt root@(none):/#).
+    echo "=== VM IS RUNNING ==="
+    echo "Guest reachable at: ssh root@${GUEST_IP}"
 else
     echo "ERROR: VM failed to start"
     cat /tmp/firecracker.log
