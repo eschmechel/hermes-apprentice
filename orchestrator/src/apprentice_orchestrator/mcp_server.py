@@ -12,13 +12,11 @@ Run: ``apprentice-orchestrator-mcp`` (needs the ``mcp`` extra:
 from __future__ import annotations
 
 import json
-import threading
 from dataclasses import asdict
 
-from . import jobs
+from . import jobs, requests
 from .config import Config
 from .jobs import JobState
-from .pipeline import run_pipeline
 
 
 def _build_server():
@@ -38,13 +36,10 @@ def _build_server():
         job_id immediately; poll job_status for progress (runs in background)."""
         job = JobState(job_id=jobs.new_job_id(pattern_id), pattern_id=pattern_id)
         job.save(cfg.jobs_dir)
-        threading.Thread(
-            target=run_pipeline,
-            args=(pattern_id,),
-            kwargs={"cfg": cfg, "job": job},
-            daemon=True,
-        ).start()
-        return {"job_id": job.job_id, "status": job.status}
+        # Decoupled: enqueue a durable request; the always-on watcher executes
+        # it (and applies the placement policy). Survives MCP restarts.
+        requests.enqueue(cfg, job.job_id, pattern_id)
+        return {"job_id": job.job_id, "status": job.status, "queued": True}
 
     @mcp.tool()
     def job_status(job_id: str) -> dict:

@@ -14,7 +14,7 @@ import json
 import logging
 from pathlib import Path
 
-from . import candidates
+from . import candidates, jobs, requests
 from .config import Config
 from .pipeline import Runner, run_pipeline
 
@@ -77,6 +77,29 @@ def tick(cfg: Config | None = None, *, runner: Runner | None = None, max_jobs: i
             _ack(cfg, marker)
 
         summary["processed"].append(marker.name)
+
+    # Drain the MCP/dispatch request queue (shares the one-GPU budget so the
+    # decisions path and the conversational path can't both seize the GPU).
+    for req in requests.pending(cfg):
+        if jobs_run >= max_jobs:
+            break
+        try:
+            data = json.loads(req.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            summary["errors"].append({"request": req.name, "error": str(e)})
+            requests.ack(cfg, req)
+            continue
+        pattern_id = data.get("pattern_id")
+        if not pattern_id:
+            summary["errors"].append({"request": req.name, "error": "missing pattern_id"})
+            requests.ack(cfg, req)
+            continue
+        existing = jobs.load_job(cfg.jobs_dir, data.get("job_id")) if data.get("job_id") else None
+        LOG.info("training requested via dispatch", extra={"pattern_id": pattern_id, "job_id": data.get("job_id")})
+        job = run_pipeline(pattern_id, cfg=cfg, runner=runner, job=existing)
+        jobs_run += 1
+        summary["trained"].append({"pattern_id": pattern_id, "job_id": job.job_id, "status": job.status})
+        requests.ack(cfg, req)
 
     return summary
 

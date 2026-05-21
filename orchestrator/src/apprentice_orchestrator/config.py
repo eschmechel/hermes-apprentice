@@ -63,6 +63,12 @@ class Config:
         return self.root / "jobs"
 
     @property
+    def job_requests_dir(self) -> Path:
+        # Durable queue MCP dispatch writes and the watcher drains (decoupled
+        # from the MCP process lifecycle).
+        return self.root / "jobs" / "requests"
+
+    @property
     def candidates_dir(self) -> Path:
         return self.root / "candidates"
 
