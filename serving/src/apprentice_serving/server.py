@@ -88,15 +88,31 @@ def build_vllm_cmd(
     port: int = 8000,
     gpu_memory_utilization: float = 0.90,
     max_model_len: int = 2048,
+    enable_lora: bool = False,
+    max_loras: int = 4,
+    max_lora_rank: int = 16,
 ) -> list[str]:
-    """Return the argv list for ``vllm serve``."""
-    return [
+    """Return the argv list for ``vllm serve``.
+
+    When *enable_lora* is set, ``model_path`` is the warm BASE model and
+    specialist adapters are hot-loaded at runtime (W1 multi-LoRA residency);
+    ``VLLM_ALLOW_RUNTIME_LORA_UPDATING`` must be on for the admin load/unload
+    endpoints (the caller sets it in the daemon env).
+    """
+    cmd = [
         "vllm", "serve", str(model_path),
         "--host", host,
         "--port", str(port),
         "--gpu-memory-utilization", str(gpu_memory_utilization),
         "--max-model-len", str(max_model_len),
     ]
+    if enable_lora:
+        cmd += [
+            "--enable-lora",
+            "--max-loras", str(max_loras),
+            "--max-lora-rank", str(max_lora_rank),
+        ]
+    return cmd
 
 
 def launch_server(cmd: list[str]) -> int:
