@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"math/rand/v2"
@@ -18,6 +19,8 @@ import (
 
 type proxyHandler struct {
 	upstreamURL    string
+	serveURL       string // warm multi-LoRA vLLM; empty => legacy per-pattern SpecialistURL
+	residencyURL   string // residency control plane (ensure adapter resident)
 	client         *http.Client
 	embedder       Embedder
 	store          *patterns.Store
@@ -35,6 +38,8 @@ type proxyHandler struct {
 func newProxyHandler(cfg Config) *proxyHandler {
 	return &proxyHandler{
 		upstreamURL:    strings.TrimRight(cfg.UpstreamURL, "/"),
+		serveURL:       strings.TrimRight(cfg.ServeURL, "/"),
+		residencyURL:   strings.TrimRight(cfg.ResidencyURL, "/"),
 		client:         cfg.HTTPClient,
 		embedder:       cfg.Embedder,
 		store:          cfg.PatternStore,
@@ -97,13 +102,33 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		return false, "no_match"
 	}
 
+	// Resolve the specialist target. Multi-LoRA mode (serveURL set): ensure the
+	// adapter (the pattern id) is resident on the warm server, then route by
+	// adapter name to that single server. Legacy mode: per-pattern SpecialistURL.
+	routeBody := body
+	destURL := strings.TrimRight(match.Pattern.SpecialistURL, "/") + "/v1/chat/completions"
+	if h.serveURL != "" {
+		if err := h.ensureAdapter(r.Context(), match.Pattern.ID); err != nil {
+			h.logger.Warn("residency ensure failed; falling back to upstream",
+				"pattern_id", match.Pattern.ID, "err", err)
+			return false, "specialist_ensure_failed"
+		}
+		if rb, rerr := rewriteModel(body, match.Pattern.ID); rerr == nil {
+			routeBody = rb
+		} else {
+			h.logger.Warn("model rewrite failed; routing original body",
+				"pattern_id", match.Pattern.ID, "err", rerr)
+		}
+		destURL = h.serveURL + "/v1/chat/completions"
+	}
+
 	var shadow *shadowJob
 	if h.shadowRate > 0 && h.rand() < h.shadowRate {
 		shadow = h.startShadow(r, body, match.Pattern.ID, hashInput(lastUser))
 	}
 
 	specStart := time.Now()
-	resp, err := h.doRequest(r.Context(), r, body, match.Pattern.SpecialistURL+"/v1/chat/completions")
+	resp, err := h.doRequest(r.Context(), r, routeBody, destURL)
 	specLatency := time.Since(specStart)
 	if err != nil {
 		h.logger.Warn("specialist call failed; falling back to upstream",
@@ -287,6 +312,47 @@ func (h *proxyHandler) doRequest(ctx context.Context, in *http.Request, body []b
 		req.Header.Set("Content-Type", "application/json")
 	}
 	return h.client.Do(req)
+}
+
+// ensureAdapter asks the residency control plane to make the adapter resident
+// on the warm server before routing. No-op when no residency URL is configured
+// (caller assumes the adapter is preloaded/pinned).
+func (h *proxyHandler) ensureAdapter(ctx context.Context, adapterID string) error {
+	if h.residencyURL == "" {
+		return nil
+	}
+	payload, _ := json.Marshal(map[string]string{"adapter_id": adapterID})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		h.residencyURL+"/residency/ensure", bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("residency ensure returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// rewriteModel returns body with its top-level "model" field set to model,
+// preserving all other fields byte-for-byte. Routes by adapter name (multi-LoRA).
+func rewriteModel(body []byte, model string) ([]byte, error) {
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(body, &m); err != nil {
+		return nil, err
+	}
+	mv, err := json.Marshal(model)
+	if err != nil {
+		return nil, err
+	}
+	m["model"] = mv
+	return json.Marshal(m)
 }
 
 func specialistResponseOK(status int, body []byte) bool {

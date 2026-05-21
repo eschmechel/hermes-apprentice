@@ -47,6 +47,13 @@ type Config struct {
 	MatchThreshold float32
 	ShadowRate     float64
 
+	// ServeURL, when set, enables multi-LoRA routing: a matched request is
+	// routed by adapter name (the pattern id) to this single warm vLLM server
+	// instead of each pattern's specialist_url. ResidencyURL is the residency
+	// control plane the proxy calls to ensure the adapter is resident first.
+	ServeURL     string
+	ResidencyURL string
+
 	// HTTPClient is optional; if nil, a default client with a long timeout is
 	// constructed.  Tests inject a client pointing at httptest.Server.
 	HTTPClient *http.Client

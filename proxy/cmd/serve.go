@@ -20,6 +20,8 @@ func serveCmd() *cobra.Command {
 	var (
 		listenAddr     string
 		upstreamURL    string
+		serveURL       string
+		residencyURL   string
 		stateDir       string
 		modelDir       string
 		ortLibPath     string
@@ -99,6 +101,8 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				Addr:           listenAddr,
 				Logger:         logger,
 				UpstreamURL:    upstreamURL,
+				ServeURL:       serveURL,
+				ResidencyURL:   residencyURL,
 				Embedder:       emb,
 				PatternStore:   store,
 				MatchThreshold: float32(matchThreshold),
@@ -113,6 +117,8 @@ chat-completions schema, so request and response shapes are unchanged.`,
 	}
 	cmd.Flags().StringVar(&listenAddr, "listen", ":8083", "HTTP listen address")
 	cmd.Flags().StringVar(&upstreamURL, "upstream-url", "https://openrouter.ai/api/v1", "Upstream OpenAI-compatible base URL (used for fallback and non-matching requests)")
+	cmd.Flags().StringVar(&serveURL, "serve-url", "", "Multi-LoRA: single warm vLLM base URL; matches route here by adapter name (empty = legacy per-pattern specialist_url)")
+	cmd.Flags().StringVar(&residencyURL, "residency-url", "", "Residency control plane URL (apprentice-serve-control); proxy ensures the adapter is resident before routing")
 	cmd.Flags().StringVar(&stateDir, "state-dir", os.ExpandEnv("$HOME/.apprentice/proxy"), "Proxy state directory (patterns.json, pricing.json)")
 	cmd.Flags().StringVar(&modelDir, "model-dir", os.ExpandEnv("$HOME/.apprentice/models/bge-small-onnx"), "Directory containing BGE-small ONNX model.onnx + vocab.json")
 	cmd.Flags().StringVar(&ortLibPath, "onnxruntime-lib", "/usr/lib/libonnxruntime.so", "Path to libonnxruntime.so (empty = use ORT default search)")

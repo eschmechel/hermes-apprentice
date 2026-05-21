@@ -69,17 +69,18 @@ func Open(path string) (*Store, error) {
 }
 
 // Upsert inserts or replaces a pattern.  Returns an error if the pattern is
-// missing an id, centroid, or specialist_url; centroid length is preserved
-// as-is (the matcher requires it to match the embedder's dimensionality).
+// missing an id or centroid; centroid length is preserved as-is (the matcher
+// requires it to match the embedder's dimensionality).
+//
+// specialist_url is OPTIONAL: under multi-LoRA serving the proxy routes by
+// adapter name (the pattern id) to a single warm --serve-url, so per-pattern
+// URLs are a legacy fallback used only when --serve-url is unset.
 func (s *Store) Upsert(p Pattern) error {
 	if p.ID == "" {
 		return errors.New("patterns: id is required")
 	}
 	if len(p.Centroid) == 0 {
 		return errors.New("patterns: centroid is required")
-	}
-	if p.SpecialistURL == "" {
-		return errors.New("patterns: specialist_url is required")
 	}
 	s.mu.Lock()
 	s.data[p.ID] = p

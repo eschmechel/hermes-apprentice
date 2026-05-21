@@ -59,11 +59,16 @@ func TestStoreUpsertRejectsBadInput(t *testing.T) {
 	for _, bad := range []Pattern{
 		{ID: "", Centroid: []float32{1}, SpecialistURL: "http://x"},
 		{ID: "x", Centroid: nil, SpecialistURL: "http://x"},
-		{ID: "x", Centroid: []float32{1}, SpecialistURL: ""},
 	} {
 		if err := s.Upsert(bad); err == nil {
 			t.Fatalf("expected error for bad pattern %+v", bad)
 		}
+	}
+
+	// specialist_url is OPTIONAL under multi-LoRA routing (route by adapter name
+	// to a single --serve-url), so an empty specialist_url must be accepted.
+	if err := s.Upsert(Pattern{ID: "x", Centroid: []float32{1}, SpecialistURL: ""}); err != nil {
+		t.Fatalf("empty specialist_url should be accepted (multi-LoRA): %v", err)
 	}
 }
 
