@@ -153,6 +153,15 @@ def merge_and_export(
                 "refuse to promote without it (run apprentice-sign sign on it first)",
                 extra={"expected": str(src)},
             )
+
+    # Carry the LoRA adapter itself into the merged dir so promote lands it in
+    # the registry — multi-LoRA serving loads the ~18 MB adapter (the merged
+    # fp16 model is export-only). Skip if adapter_dir already IS output_dir's child.
+    adapter_copy = output_dir / "lora-adapter"
+    if adapter_dir.resolve() != adapter_copy.resolve():
+        shutil.copytree(adapter_dir, adapter_copy, dirs_exist_ok=True)
+        LOG.info("copied lora-adapter into merged dir for registry/serving",
+                 extra={"adapter_dir": str(adapter_copy)})
     return output_dir
 
 
