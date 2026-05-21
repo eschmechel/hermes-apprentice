@@ -36,6 +36,14 @@ class Config:
     observer_url: str | None = field(default_factory=lambda: _env("APPRENTICE_OBSERVER_URL"))
     presidio_url: str | None = field(default_factory=lambda: _env("APPRENTICE_PRESIDIO_URL"))
 
+    # Placement policy (VRAM arbiter). Autonomous runs use these without
+    # blocking; interactive surfaces may override per-run (stretch).
+    training_placement: str = field(default_factory=lambda: _env("APPRENTICE_TRAINING_PLACEMENT", "local"))
+    train_vram_mb: int = field(default_factory=lambda: int(_env("APPRENTICE_TRAIN_VRAM_MB", "4000")))
+    # What to do when a local run is requested but the GPU is busy (warm serve):
+    # "evict" (stop the warm serve to free VRAM) | "cloud" (burst, stretch) | "skip".
+    on_vram_conflict: str = field(default_factory=lambda: _env("APPRENTICE_ON_VRAM_CONFLICT", "evict"))
+
     # ---- per-pattern paths -------------------------------------------------
     def datasets_dir(self, pattern_id: str) -> Path:
         return self.root / "datasets" / pattern_id

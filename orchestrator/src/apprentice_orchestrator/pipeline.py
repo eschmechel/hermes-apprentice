@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 from typing import Callable
 
-from . import jobs
+from . import jobs, placement
 from .config import Config, latest_version_dir
 from .jobs import JobState
 from .venvs import tool
@@ -72,6 +72,7 @@ def run_pipeline(
     JobState and, for the validate gate, a Telegram failure message.
     """
     cfg = cfg or Config()
+    real_run = runner is None  # only touch the real GPU (placement) on real runs
     runner = runner or _default_runner
     job = job or JobState(job_id=jobs.new_job_id(pattern_id), pattern_id=pattern_id)
     logs_root = cfg.jobs_dir / job.job_id
@@ -99,7 +100,11 @@ def run_pipeline(
         merged.mkdir(parents=True, exist_ok=True)
         baseline.parent.mkdir(parents=True, exist_ok=True)
 
-        # 2. train  (venv-train)
+        # 2. train  (venv-train) — free the GPU first per the placement policy
+        # (evict the warm serve if it's holding VRAM). Real runs only.
+        if real_run:
+            gpu = placement.prepare_local_gpu(cfg)
+            LOG.info("gpu placement", extra=gpu)
         train_argv = [tool("train", "apprentice-train"),
                       "--dataset-dir", str(ds), "--output-dir", str(ckpt),
                       "--max-steps", str(cfg.max_steps), "-v"]
