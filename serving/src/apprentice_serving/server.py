@@ -157,6 +157,9 @@ def check_only(
     host: str = "0.0.0.0",
     gpu_memory_utilization: float = 0.90,
     max_model_len: int = 2048,
+    enable_lora: bool = False,
+    max_loras: int = 4,
+    max_lora_rank: int = 16,
 ) -> int:
     """Validate arguments without launching vLLM.  Returns exit code."""
     try:
@@ -175,6 +178,9 @@ def check_only(
         port=port,
         gpu_memory_utilization=gpu_memory_utilization,
         max_model_len=max_model_len,
+        enable_lora=enable_lora,
+        max_loras=max_loras,
+        max_lora_rank=max_lora_rank,
     )
 
     LOG.info("check-only passed", extra={

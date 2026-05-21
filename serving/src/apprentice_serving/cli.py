@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -42,6 +43,13 @@ def build_serve_parser() -> argparse.ArgumentParser:
                    help="vLLM GPU memory fraction (default: 0.90).")
     p.add_argument("--max-model-len", type=int, default=2048,
                    help="vLLM max context length (default: 2048).")
+    p.add_argument("--enable-lora", action="store_true",
+                   help="Serve --model-dir as a WARM BASE and hot-swap specialist "
+                        "LoRA adapters at runtime (multi-LoRA residency).")
+    p.add_argument("--max-loras", type=int, default=4,
+                   help="Max LoRA adapters resident at once (default: 4).")
+    p.add_argument("--max-lora-rank", type=int, default=16,
+                   help="Max LoRA rank (must be >= the trained rank; default: 16).")
     p.add_argument("--check-only", action="store_true",
                    help="Validate args + resolve model path without launching.")
     p.add_argument("-v", "--verbose", action="store_true")
@@ -54,12 +62,19 @@ def run_serve(args: argparse.Namespace) -> int:
         model_dir=args.model_dir,
         registry_url=args.registry_url,
     )
+    if args.enable_lora:
+        # Required for the runtime load/unload admin endpoints the residency
+        # manager drives.
+        os.environ["VLLM_ALLOW_RUNTIME_LORA_UPDATING"] = "True"
     cmd = server.build_vllm_cmd(
         model_path,
         host=args.host,
         port=args.port,
         gpu_memory_utilization=args.gpu_memory_util,
         max_model_len=args.max_model_len,
+        enable_lora=args.enable_lora,
+        max_loras=args.max_loras,
+        max_lora_rank=args.max_lora_rank,
     )
     return server.launch_server(cmd)
 
@@ -77,6 +92,9 @@ def main_serve(argv: list[str] | None = None) -> int:
             host=args.host,
             gpu_memory_utilization=args.gpu_memory_util,
             max_model_len=args.max_model_len,
+            enable_lora=args.enable_lora,
+            max_loras=args.max_loras,
+            max_lora_rank=args.max_lora_rank,
         )
 
     return run_serve(args)
