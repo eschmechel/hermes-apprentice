@@ -121,6 +121,7 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				LatencyTracker: latencyTracker,
 				Pricing:        pricing,
 				Metrics:        metrics,
+				StateDir:       stateDir,
 			})
 
 			return srv.ListenAndServe(ctx)

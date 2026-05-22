@@ -11,6 +11,10 @@
 //	POST /patterns                 register or replace a pattern (called by
 //	                                the detector after operator approval).
 //	GET  /patterns                 list registered patterns.
+//	GET  /api/cost/roi             ROI summary for all patterns.
+//	GET  /api/cost/roi/{pattern_id} ROI summary for one pattern.
+//	GET  /api/cost/usage           usage-over-time buckets (query: pattern_id, bucket).
+//	GET  /api/cost/latency         latency stats for specialist vs upstream.
 package httpapi
 
 import (
@@ -69,6 +73,10 @@ type Config struct {
 	// Metrics provides an optional Prometheus metrics recorder.
 	// When nil, metrics are not recorded.
 	Metrics *Metrics
+
+	// StateDir is the proxy state directory (used by cost API to locate
+	// ledger.jsonl and proxy.log). When empty, cost endpoints are disabled.
+	StateDir string
 }
 
 type Server struct {
@@ -102,6 +110,14 @@ func New(cfg Config) *Server {
 	pat := newPatternsHandler(cfg.PatternStore, cfg.Logger)
 	mux.HandleFunc("POST /patterns", pat.handleRegister)
 	mux.HandleFunc("GET /patterns", pat.handleList)
+
+	if cfg.StateDir != "" {
+		ch := newCostHandler(cfg.StateDir, cfg.Logger)
+		mux.HandleFunc("GET /api/cost/roi", ch.handleROI)
+		mux.HandleFunc("GET /api/cost/roi/{pattern_id}", ch.handleROI)
+		mux.HandleFunc("GET /api/cost/usage", ch.handleUsage)
+		mux.HandleFunc("GET /api/cost/latency", ch.handleLatency)
+	}
 
 	if cfg.Metrics != nil {
 		mux.HandleFunc("GET /metrics", cfg.Metrics.Handler().ServeHTTP)
