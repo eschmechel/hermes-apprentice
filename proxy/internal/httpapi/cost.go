@@ -10,15 +10,18 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/hermes-apprentice/proxy/internal/runpod"
 )
 
 type costHandler struct {
-	stateDir string
-	logger   *slog.Logger
+	stateDir     string
+	logger       *slog.Logger
+	runpodClient *runpod.Client
 }
 
-func newCostHandler(stateDir string, logger *slog.Logger) *costHandler {
-	return &costHandler{stateDir: stateDir, logger: logger}
+func newCostHandler(stateDir string, logger *slog.Logger, runpodClient *runpod.Client) *costHandler {
+	return &costHandler{stateDir: stateDir, logger: logger, runpodClient: runpodClient}
 }
 
 func (ch *costHandler) ledgerPath() string {
@@ -101,6 +104,26 @@ func (ch *costHandler) handleLatency(w http.ResponseWriter, r *http.Request) {
 	stats := computeLatencyStats(proxy)
 
 	writeJSON(w, http.StatusOK, stats)
+}
+
+func (ch *costHandler) handleRunPod(w http.ResponseWriter, r *http.Request) {
+	if ch.runpodClient == nil {
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{
+			"error": "RunPod API key not configured",
+		})
+		return
+	}
+
+	summary, err := ch.runpodClient.ListPods(r.Context())
+	if err != nil {
+		ch.logger.Warn("runpod list failed", "err", err)
+		writeJSON(w, http.StatusBadGateway, map[string]string{
+			"error": "RunPod API error: " + err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, summary)
 }
 
 // ── ledger parsing ───────────────────────────────────────────────────────────

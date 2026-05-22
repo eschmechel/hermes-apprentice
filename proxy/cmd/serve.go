@@ -14,6 +14,7 @@ import (
 	"github.com/hermes-apprentice/proxy/internal/embedder"
 	"github.com/hermes-apprentice/proxy/internal/httpapi"
 	"github.com/hermes-apprentice/proxy/internal/patterns"
+	"github.com/hermes-apprentice/proxy/internal/runpod"
 	"github.com/spf13/cobra"
 )
 
@@ -29,6 +30,7 @@ func serveCmd() *cobra.Command {
 		matchThreshold float64
 		shadowRate     float64
 		logFile        string
+		runpodAPIKey   string
 	)
 
 	cmd := &cobra.Command{
@@ -108,6 +110,17 @@ chat-completions schema, so request and response shapes are unchanged.`,
 
 			metrics := httpapi.NewMetrics()
 
+			var rpClient *runpod.Client
+			if runpodAPIKey != "" {
+				rpClient = runpod.New(runpodAPIKey)
+				if err := rpClient.Ping(c.Context()); err != nil {
+					logger.Warn("RunPod API key set but ping failed; /api/cost/runpod may error",
+						"err", err)
+				} else {
+					logger.Info("RunPod client connected")
+				}
+			}
+
 			srv := httpapi.New(httpapi.Config{
 				Addr:           listenAddr,
 				Logger:         logger,
@@ -122,6 +135,7 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				Pricing:        pricing,
 				Metrics:        metrics,
 				StateDir:       stateDir,
+				RunPodClient:   rpClient,
 			})
 
 			return srv.ListenAndServe(ctx)
@@ -137,5 +151,6 @@ chat-completions schema, so request and response shapes are unchanged.`,
 	cmd.Flags().Float64Var(&matchThreshold, "match-threshold", 0.78, "Minimum cosine similarity to consider a pattern matched")
 	cmd.Flags().Float64Var(&shadowRate, "shadow-rate", 0.05, "Fraction of matched requests to also send to upstream for shadow comparison (0..1)")
 	cmd.Flags().StringVar(&logFile, "log-file", "", "Write JSON request log to file in addition to stderr (default: no file)")
+	cmd.Flags().StringVar(&runpodAPIKey, "runpod-api-key", "", "RunPod API key for live pod cost tracking (enables /api/cost/runpod)")
 	return cmd
 }

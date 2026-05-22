@@ -15,6 +15,7 @@
 //	GET  /api/cost/roi/{pattern_id} ROI summary for one pattern.
 //	GET  /api/cost/usage           usage-over-time buckets (query: pattern_id, bucket).
 //	GET  /api/cost/latency         latency stats for specialist vs upstream.
+//	GET  /api/cost/runpod          live RunPod pod costs (requires --runpod-api-key).
 //	GET  /dashboard                cost/ROI dashboard (Vue.js + Chart.js).
 package httpapi
 
@@ -27,6 +28,7 @@ import (
 	"time"
 
 	"github.com/hermes-apprentice/proxy/internal/patterns"
+	"github.com/hermes-apprentice/proxy/internal/runpod"
 )
 
 // Embedder is the minimal surface the proxy needs from the BGE-small
@@ -78,6 +80,10 @@ type Config struct {
 	// StateDir is the proxy state directory (used by cost API to locate
 	// ledger.jsonl and proxy.log). When empty, cost endpoints are disabled.
 	StateDir string
+
+	// RunPodClient provides live RunPod pod cost data for /api/cost/runpod.
+	// When nil, the endpoint returns 503 (not configured).
+	RunPodClient *runpod.Client
 }
 
 type Server struct {
@@ -113,11 +119,12 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /patterns", pat.handleList)
 
 	if cfg.StateDir != "" {
-		ch := newCostHandler(cfg.StateDir, cfg.Logger)
+		ch := newCostHandler(cfg.StateDir, cfg.Logger, cfg.RunPodClient)
 		mux.HandleFunc("GET /api/cost/roi", ch.handleROI)
 		mux.HandleFunc("GET /api/cost/roi/{pattern_id}", ch.handleROI)
 		mux.HandleFunc("GET /api/cost/usage", ch.handleUsage)
 		mux.HandleFunc("GET /api/cost/latency", ch.handleLatency)
+		mux.HandleFunc("GET /api/cost/runpod", ch.handleRunPod)
 		mux.HandleFunc("GET /dashboard", s.handleDashboard)
 	}
 

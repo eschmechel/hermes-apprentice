@@ -27,7 +27,7 @@ func setupCostTest(t *testing.T, ledgerContent, proxyLogContent string) (*httpte
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
-	ch := newCostHandler(stateDir, logger)
+	ch := newCostHandler(stateDir, logger, nil)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/cost/roi", ch.handleROI)
