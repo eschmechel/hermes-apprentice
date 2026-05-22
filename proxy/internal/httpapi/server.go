@@ -15,6 +15,7 @@
 //	GET  /api/cost/roi/{pattern_id} ROI summary for one pattern.
 //	GET  /api/cost/usage           usage-over-time buckets (query: pattern_id, bucket).
 //	GET  /api/cost/latency         latency stats for specialist vs upstream.
+//	GET  /dashboard                cost/ROI dashboard (Vue.js + Chart.js).
 package httpapi
 
 import (
@@ -117,6 +118,7 @@ func New(cfg Config) *Server {
 		mux.HandleFunc("GET /api/cost/roi/{pattern_id}", ch.handleROI)
 		mux.HandleFunc("GET /api/cost/usage", ch.handleUsage)
 		mux.HandleFunc("GET /api/cost/latency", ch.handleLatency)
+		mux.HandleFunc("GET /dashboard", s.handleDashboard)
 	}
 
 	if cfg.Metrics != nil {
