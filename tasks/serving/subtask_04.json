@@ -2,7 +2,7 @@
   "id": "serving-04",
   "seq": "04",
   "title": "Write systemd unit for auto-start on boot",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

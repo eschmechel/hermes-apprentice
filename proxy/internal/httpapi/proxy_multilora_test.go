@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/patterns"
 )
 
 // W1: with --serve-url + --residency-url set, a matched request ensures the

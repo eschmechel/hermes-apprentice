@@ -8,7 +8,7 @@ import (
 
 // Version is the observer build version. Set at link time via:
 //
-//	go build -ldflags "-X github.com/hermes-apprentice/observer/cmd.Version=<sha>"
+//	go build -ldflags "-X github.com/eschmechel/hermes-apprentice/observer/cmd.Version=<sha>"
 var Version = "dev"
 
 func versionCmd() *cobra.Command {

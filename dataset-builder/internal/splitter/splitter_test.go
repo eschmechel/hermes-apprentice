@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 )
 
 func makeRecs(n int) []fetcher.Record {

@@ -14,7 +14,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/hermes-apprentice/burst/internal/plan"
+	"github.com/eschmechel/hermes-apprentice/burst/internal/plan"
 )
 
 type Runner struct {

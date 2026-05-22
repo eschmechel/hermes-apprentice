@@ -2,7 +2,7 @@
   "id": "validator-05",
   "seq": "05",
   "title": "On pass: copy merged model to ~/apprentice/registry/<skill-id>/v<n>/, sign manifest",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["04"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

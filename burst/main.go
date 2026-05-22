@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hermes-apprentice/burst/cmd"
+	"github.com/eschmechel/hermes-apprentice/burst/cmd"
 )
 
 func main() {

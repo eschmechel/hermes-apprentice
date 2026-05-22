@@ -1,4 +1,4 @@
-# Apprentice — Hermes Agent that trains its own specialists
+# Apprentice — Hermes Agent that trains its own specialists (v0.2)
 
 Hermes Agent accumulates Markdown skills from experience. **Apprentice** adds
 a second loop: when Hermes has handled a request pattern enough times, the
@@ -13,7 +13,10 @@ Built for the [Hermes Agent Challenge](https://dev.to/challenges/hermes-agent-20
 (May 15–31, 2026). Base model: Qwen2.5-1.5B-Instruct (Apache 2.0). Hermes
 runs inside a Firecracker microVM; everything else runs on the host.
 
-> ![graduation moment GIF — placeholder, recorded in `demo-02`](docs/assets/graduation.gif)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Go Coverage](https://img.shields.io/badge/go%20coverage-65.2%25-yellow)](proxy/)
+[![Python Tests](https://img.shields.io/badge/python%20tests-328%20passed-green)](orchestrator/)
+[![Hermes Agent Challenge](https://img.shields.io/badge/contest-Hermes%20Agent%20Challenge-ff69b4)](https://dev.to/challenges/hermes-agent-2026-05-15)
 
 ## Architecture
 
@@ -25,192 +28,238 @@ flowchart LR
         H -.chats.-> P
     end
 
-    subgraph Host["Host (Linux + 2080 Ti / RunPod burst)"]
+    subgraph Host["Host (Linux + GPU / RunPod burst)"]
         subgraph Capture["1. Capture"]
-            DB[(~/.hermes/state.db<br/>SQLite WAL)]
-            O[Observer<br/>Go]
-            DET[Pattern Detector<br/>Go + BGE-small ONNX]
+            DB[(~/.hermes/state.db)]
+            O[Observer]
+            DET[Pattern Detector<br/>BGE-small ONNX]
             DB --> O --> DET
         end
 
-        subgraph Train["2. Train"]
-            DSB[Dataset Builder<br/>Go + Presidio]
-            TR[Trainer<br/>Unsloth QLoRA]
-            EXP[Merge & Export<br/>fp16 merged_16bit]
-            DET --> DSB --> TR --> EXP
+        subgraph Approve["2. Approve"]
+            TG_BOT[Telegram Bot<br/>poll-replies]
+            ORCH[Orchestrator<br/>watcher.tick]
+            DET --> TG_BOT --> ORCH
         end
 
-        subgraph Validate["3. Validate & Promote"]
+        subgraph Train["3. Train"]
+            DSB[Dataset Builder<br/>Go + Presidio]
+            TR[Trainer<br/>Unsloth QLoRA]
+            EXP[Merge & Export<br/>fp16]
+            ORCH --> DSB --> TR --> EXP
+        end
+
+        subgraph Validate["4. Validate & Promote"]
             BL[apprentice-baseline<br/>vLLM offline]
-            VAL[apprentice-validate<br/>vLLM + gate]
+            VAL[apprentice-validate<br/>promotion gate]
             REG[(~/.apprentice/registry<br/>signed manifests)]
             EXP --> BL --> VAL --> REG
         end
 
-        subgraph Serve["4. Serve"]
+        subgraph Serve["5. Serve"]
             SV[apprentice-serve<br/>vLLM HTTP]
-            P[Proxy<br/>Go + 5% shadow]
+            P[Proxy<br/>Go router]
             REG --> SV
             P --> SV
         end
 
-        subgraph Notify["5. Notify"]
-            OB[~/.apprentice/outbox]
-            TG[apprentice-telegram<br/>+ Hermes deliver]
-            DET --> OB
-            VAL --> OB
-            P --> OB
-            OB --> TG
+        subgraph Monitor["6. Monitor"]
+            PR[Prometheus]
+            GF[Grafana]
+            P --> PR --> GF
         end
     end
 
-    P -- upstream fallback --> OR[(OpenRouter)]
-    TG -.via Hermes cron.-> User[Telegram channel]
-    CRON --> TG
-    User -.replies.-> POLL[poll-replies<br/>getUpdates] --> DEC[(decisions/)]
+    P -- canary ramp --> CANARY[Canary Manager]
+    P -- tenant auth --> TENANTS[(Tenants/)]
+    P -- upstream fallback --> OR[(OpenRouter<br/>+ multi-provider)]
+    TG_BOT -.via Hermes cron.-> User[Telegram channel]
+    User -.replies.-> TG_BOT
     VAL --> SKILL[/.hermes/skills/&lt;id&gt;/SKILL.md]
     SKILL -.next session.-> H
 
     classDef done fill:#1f9d55,stroke:#0d6e3a,color:#fff;
-    class O,DET,DSB,TR,EXP,BL,VAL,REG,SV,P,OB,TG,POLL,DEC,SKILL done;
+    class O,DET,DSB,TR,EXP,BL,VAL,REG,SV,P,ORCH,TG_BOT,CANARY,TENANTS,PR,GF,SKILL done;
 ```
 
-Every coloured node is built and committed (see [Status](#status)). The
-upstream API and Telegram channel are external.
+## v0.2 Feature Highlights
 
-### How a request flows through the proxy
+| Feature | Description |
+|---------|-------------|
+| **Canary Ramp** | Specialist rollouts start at 5% traffic, auto-advance to 100% as agreement scores prove safe. Broken specialists are quarantined automatically. |
+| **Multi-Base-Model** | Train on Qwen2.5-1.5B (default), Qwen2.5-3B, or Llama-3.2-3B. User-editable `supported_models.yaml`. |
+| **Pattern Merging** | Combine two specialists into one. MCP `propose_merge` → Telegram approval → merged dataset → regression gate. |
+| **Multi-Tenant** | `X-Apprentice-Tenant` header + API key auth. Per-tenant rate limiting, quota management, global patterns. |
+| **Monthly Budget** | Monetary budget with Telegram alerts at 80%/95%/100% thresholds. On-demand increase via `budget increase $N` reply. |
+| **Grafana Dashboards** | 8-panel dashboard: request rate, latency p50/p95/p99, error rate, cost saved, top patterns, specialist-vs-upstream latency, status pie, 24h counters. |
+| **RunPod Burst** | Cloud training on A100/A6000/L40S. GPU type auto-selection, budget-gated provisioning. |
+| **Multi-Provider Upstream** | OpenRouter primary, Fireworks/MiniMax/Together as fallback tiers. |
 
-1. Hermes' chat endpoint is configured to point at the local **Proxy**
-   (`:8083/v1/chat/completions`).
-2. The proxy embeds the last user message with **BGE-small ONNX** (384-dim,
-   normalized) and compares it against every known pattern centroid by
-   cosine.
-3. Match above `--match-threshold` (default `0.78`) → forward to the local
-   specialist via **apprentice-serve** (free, ~38ms).
-4. No match or specialist returns non-2xx / empty `choices` → fall back to
-   the upstream `--upstream-url` (OpenRouter, paid).
-5. **5% shadow rate**: when the specialist handles a turn, a concurrent
-   upstream call fires too so we can diff quality offline.
+## How a request flows
 
-Every routed turn emits a structured JSON log line with `route_decision`,
-`pattern_id`, `latency_ms`, `prompt_tokens`, `completion_tokens`,
-`estimated_cost_usd`, and `cost_saved_usd`. Prometheus counters at
-`/metrics`; rolling p50/p99 at `/stats`.
+1. Hermes' chat endpoint points at the local **Proxy** (`:8083/v1/chat/completions`).
+2. **Auth**: If `--tenant-root` is set, `X-Apprentice-Tenant` + `X-Apprentice-Key` headers are validated.
+3. **Rate check**: Per-tenant token bucket enforced if `--tenant-ratelimit-rpm` is set.
+4. **Embed**: Last user message embedded with BGE-small ONNX (384-dim, L2-normalized).
+5. **Match**: Cosine similarity against registered pattern centroids, scoped to tenant + global.
+6. **Alias resolution**: Pattern ID may be aliased (for merged patterns).
+7. **Canary check**: Warming patterns route probabilistically (5%→100%), broken patterns are quarantined.
+8. **Route**: Match → local specialist (free, ~38ms). No match → upstream fallback (OpenRouter, paid).
+9. **Shadow**: 5% of matched requests also hit upstream for offline quality comparison.
+10. **Log**: Structured JSON log line with route_decision, pattern_id, latency, token counts, cost.
+
+Every routed turn emits a structured JSON log line. Prometheus counters at `/metrics` (Grafana dashboards pre-built). Rolling p50/p99 at `/stats`. Canary state at `/canary/state`.
 
 ## Repo layout
 
 ```
 hermes-apprentice/
-├── observer/             — Go.   Tails ~/.hermes/state.db, normalises pairs.
-├── detector/             — Go.   BGE-small ONNX → HDBSCAN → candidate patterns.
-├── dataset-builder/      — Go.   Fetches pairs, redacts PII, splits 80/10/10.
-├── trainer/              — Py.   Unsloth QLoRA on Qwen2.5-1.5B + manifest signer.
-├── validator/            — Py.   apprentice-baseline (vLLM batch) + apprentice-validate
-│                                 (promotion gate, signed registry, SKILL.md push).
-├── serving/              — Py.   apprentice-serve wraps `vllm serve`.
-├── proxy/                — Go.   OpenAI-compat router + 5% shadow + /stats /metrics.
-├── registry-service/     — Go.   Read-only HTTP over ~/.apprentice/registry/.
-├── telegram/             — Py.   Templates + outbox + getUpdates reply poller.
-├── burst/                — Go.   RunPod A100 spot dispatcher (signed jobs).
-├── tasks/                — JSON. 73-subtask plan, status flipped per milestone.
-├── notes/                — Md.   Hermes source reads, integration runbooks.
-└── docs/                 — Md.   Feasibility plan + session export.
+├── observer/             — Go    Tails ~/.hermes/state.db, normalises pairs
+├── detector/             — Go    BGE-small ONNX → HDBSCAN → candidate patterns
+├── dataset-builder/      — Go    Fetches pairs, redacts PII, splits 80/10/10, merge tool
+├── trainer/              — Py    Unsloth QLoRA + manifest signer + multi-base-model
+├── validator/            — Py    Baseline runner + promotion gate + registry + merge regression
+├── serving/              — Py    vLLM HTTP server + residency control plane
+├── proxy/                — Go    OpenAI-compat router with canary/tenants/ratelimit/aliases/cost
+├── registry-service/     — Go    Read-only HTTP over ~/.apprentice/registry/
+├── orchestrator/         — Py    Autonomous pipeline driver + MCP tools + budget/quota/safety
+├── telegram/             — Py    Templates + outbox + getUpdates reply poller
+├── installer/            — Py    Interactive setup: detect host, build venvs + Go, write .env
+├── burst/                — Go    RunPod A100 spot dispatcher (signed jobs)
+├── deploy/               — YAML  Docker compose, Grafana dashboards, Prometheus config
+├── scripts/              — Sh    Demo script, helper utilities
+├── tasks/                — JSON  73-subtask tracker
+├── notes/                — Md    Research, integration runbooks, verification docs
+└── docs/                 — Md    Feasibility plan, benchmarks, migration guides
 ```
 
 ## Quickstart
 
 ### Prerequisites
 
-- Linux host with KVM and tun/tap (for Firecracker).
-- Go 1.22+, Python 3.10–3.12, `uv` (Astral), Docker (for Presidio sidecar).
-- An NVIDIA GPU for training (2080 Ti 11GB is enough for QLoRA) **or** a
-  RunPod account for cloud burst.
-- A Telegram bot token + chat id if you want notifications.
+- Linux host with KVM and tun/tap (for Firecracker)
+- Go 1.26+, Python 3.10+, `uv` (Astral), Docker (for Presidio sidecar)
+- NVIDIA GPU for training (2080 Ti 11GB suffices) **or** RunPod account for cloud burst
+- Telegram bot token + chat ID (optional, for notifications)
 
 ### One-time setup
 
 ```bash
-# Hermes microVM (~10 min, see .firecracker/ for the rootfs build):
+# Hermes microVM (~10 min)
 bash .firecracker/bootstrap.sh
 .firecracker/vm.sh start
 
-# Host Python packages — all editable, all uv-managed:
-for pkg in trainer validator serving telegram; do
+# All-in-one installer (detects GPU, recommends profile, builds Go + Python, writes .env)
+apprentice-setup --apply
+
+# With flags for scripting / CI:
+apprentice-setup --apply --non-interactive \
+    --telegram-token "$BOT_TOKEN" --telegram-chat-id "$CHAT_ID" \
+    --openrouter-key "$OPENROUTER_KEY" --base-model qwen2.5-1.5b \
+    --monthly-budget 20 --enable-monitoring
+```
+
+`apprentice-setup --apply` runs the full install plan:
+
+1. Detects the host (GPU / KVM / Docker / uv) and recommends an isolation profile.
+2. Collects Telegram, OpenRouter, and RunPod API keys (optional — skippable).
+3. Sets up your base model (Qwen2.5-1.5B, Qwen2.5-3B, or Llama-3.2-3B).
+4. Configures a monthly cloud budget (default $20; 0 = local-only).
+5. Builds Go binaries (proxy, dataset-builder, registry-service, burst) into `~/.apprentice/bin/`.
+6. Reproduces two uv venvs from lockfiles (`venv-train`, `venv-serve`).
+7. Prints cron lines to register with your scheduler.
+8. Optional: starts Prometheus + Grafana via Docker (`--enable-monitoring`).
+
+Dry-run by default (omit `--apply` to preview the install plan). All settings persist in `~/.apprentice/.env` — re-running only updates what you provide.
+
+**Manual alternative (if you prefer step-by-step control):**
+
+```bash
+# Host Python packages
+for pkg in trainer validator serving telegram orchestrator installer; do
   ( cd "$pkg" && uv pip install -e . )
 done
 
-# Host Go binaries:
+# Host Go binaries
 for pkg in observer detector dataset-builder proxy registry-service burst; do
   ( cd "$pkg" && go build ./... && go install ./... )
 done
 
-# Apprentice trainer key (used to sign training & registry manifests):
+# Apprentice trainer key (used to sign manifests)
 apprentice-trainer-keygen ~/.apprentice/keys
 ```
+
+### Demo (single command)
+
+```bash
+bash scripts/demo-run.sh
+```
+
+Reproducible end-to-end: seeds a session log → detection → pipeline → promotion → serving → test request → dashboard URL + summary.
 
 ### Drive the pipeline
 
 ```bash
-# 1. Capture: tail Hermes' SQLite into ~/.apprentice/observer/observer.db
+# 1. Capture
 observer serve --listen :8081 --hermes-db ~/.hermes/state.db &
-
-# 2. Detect: every 15 min, embed + cluster recent inputs, write pattern manifests
 detector serve --listen :8082 --observer-url http://localhost:8081 &
 
-# 3. Build the dataset for a graduated pattern:
-dataset-builder build --pattern-id <id> --observer-url http://localhost:8081 \
-    --out ~/.apprentice/datasets/<id>/v1/
+# 2. Build dataset
+dataset-builder build --pattern-id <id> --observer-url http://localhost:8081
 
-# 4. Train (local 2080 Ti or burst to RunPod):
-apprentice-train --pattern-id <id> \
-    --dataset ~/.apprentice/datasets/<id>/v1/train.jsonl.gz \
-    --output  ~/.apprentice/checkpoints/<id>/v1/ \
-    --profile rtx-2080-ti
+# 3. Train + merge + validate (orchestrator runs all)
+apprentice-orchestrator tick
 
-apprentice-merge --base-model unsloth/Qwen2.5-1.5B-Instruct \
-    --adapter-dir ~/.apprentice/checkpoints/<id>/v1/lora-adapter \
-    --output-dir  ~/.apprentice/merged/<id>/v1/
+# 4. Serve
+apprentice-serve --model-dir ~/.apprentice/registry/<id>/latest/ --port 8000 &
 
-# 5. Baseline (once per dataset/base-model pair):
-apprentice-baseline --test-dataset ~/.apprentice/datasets/<id>/v1/test.jsonl.gz \
-    --output ~/.apprentice/baselines/<id>-v1.jsonl
+# 5. Proxy
+proxy serve --listen :8083 \
+  --upstream-url https://openrouter.ai/api/v1 \
+  --tenant-root ~/.apprentice/tenants \
+  --tenant-ratelimit-rpm 60
 
-# 6. Validate + promote:
-apprentice-validate --pattern-id <id> \
-    --model-dir     ~/.apprentice/merged/<id>/v1 \
-    --test-dataset  ~/.apprentice/datasets/<id>/v1/test.jsonl.gz \
-    --baseline-pairs ~/.apprentice/baselines/<id>-v1.jsonl
-
-# 7. Serve the promoted model:
-apprentice-serve --model-dir ~/.apprentice/registry/<id>/latest/ \
-    --port 8000 --gpu-memory-utilization 0.85 &
-
-# 8. Proxy in front of Hermes:
-proxy serve --listen :8083 --upstream-url https://openrouter.ai/api/v1
-
-# Point Hermes' chat endpoint at http://10.0.2.1:8083/v1/chat/completions.
+# Point Hermes: http://__HOST_IP__:8083/v1/chat/completions
 ```
 
-### Telegram (optional but slick)
+### Telegram (optional)
 
 ```bash
-# Enqueue a graduation message when the detector promotes a pattern:
+# Enqueue graduation message
 apprentice-telegram enqueue graduation --pattern-id <id> \
-    --record-count 42 --description "Extract SKU + qty from order emails." \
-    --example "Order #4421 — confirm SKU AX-7 qty 3."
+    --record-count 42 --description "Extract SKU + qty from order emails."
 
-# Inside the microVM, register the dispatcher + poller as Hermes cron jobs:
-scp telegram/scripts/apprentice-telegram-*.sh root@10.0.2.2:/root/.hermes/scripts/
-ssh root@10.0.2.2 'hermes cron create --name apprentice-telegram \
-    --no-agent --script apprentice-telegram-dispatch.sh \
-    --deliver telegram "every 5m"'
-ssh root@10.0.2.2 'hermes cron create --name apprentice-poll-replies \
-    --no-agent --script apprentice-telegram-poll.sh "every 1m"'
+# Register Hermes cron jobs
+scp telegram/scripts/apprentice-telegram-*.sh root@GUEST:/root/.hermes/scripts/
+ssh root@GUEST 'hermes cron create --name apprentice-telegram --no-agent \
+    --script apprentice-telegram-dispatch.sh --deliver telegram "every 5m"'
+ssh root@GUEST 'hermes cron create --name apprentice-poll-replies --no-agent \
+    --script apprentice-telegram-poll.sh "every 1m"'
 ```
 
-User replies (`train gc-abcd1234`, `details gc-abcd1234`, `skip gc-abcd1234`)
-land as JSON decision markers under `~/.apprentice/decisions/`. See
-[`notes/telegram-integration.md`](notes/telegram-integration.md).
+Reply commands: `train gc-abcd1234`, `skip gc-abcd1234`, `details gc-abcd1234`, `budget increase 10`.
+
+### Multi-tenant setup
+
+```bash
+# Register tenants
+apprentice-orchestrator quota set --tenant acme --max-loras 5
+apprentice-orchestrator budget set --tenant acme --monthly 100
+
+# Proxy with auth
+proxy serve --tenant-root ~/.apprentice/tenants --global-api-key "admin-secret"
+
+# Clients send headers
+curl -H "X-Apprentice-Tenant: acme" -H "X-Apprentice-Key: <tenant-key>" ...
+```
+
+### Monitoring
+
+```bash
+docker compose -f deploy/docker/compose.monitoring.yml up -d
+# Grafana: http://localhost:3000 (anonymous viewer)
+# Prometheus: http://localhost:9090
+```
 
 ## Status
 
@@ -227,30 +276,39 @@ land as JSON decision markers under `~/.apprentice/decisions/`. See
 | skill | 5 | 5 |
 | instrumentation | 4 | 4 |
 | telegram | 6 | 6 |
-| demo | 7 | 1 (this README) |
+| **v0.2 features** | — | **all** |
+| demo | 7 | 2 (README + script) |
 
-Full plan: [`docs/apprentice-task-breakdown-2026-05-18-approved.md`](docs/apprentice-task-breakdown-2026-05-18-approved.md).
-Per-milestone integration notes: [`notes/`](notes/).
+## Design choices
 
-## Design choices worth knowing
+- **Hermes lives in a microVM, never on the host** — Skill files are scp'd in.
+- **The proxy is the deterministic router; the SKILL.md is for ecosystem visibility.**
+- **Baseline is split from validate** (Option G) — separate CLIs, file seam, two LLMs never share GPU.
+- **Outgoing Telegram rides Hermes' cron adapter** — no python-telegram-bot on the host.
+- **Every training & registry manifest is Ed25519-signed.**
+- **Canary ramp is self-correcting** — warming→live as agreement scores prove safe, warming→broken if scores drop below threshold.
+- **Pattern merging requires operator approval** — MCP proposal → Telegram confirmation → regression gate against both parents.
+- **Budget enforcement gates cloud spend** — 80% warning, 95% pause, 100% block. Only bypass via Telegram `budget increase`.
 
-- **Hermes lives in a microVM, never on the host.** Skill files are written
-  to a host staging dir then `scp`'d into `/root/.hermes/skills/<id>/`. See
-  [`notes/skill-registration.md`](notes/skill-registration.md).
-- **The proxy is the deterministic router; the SKILL.md is for ecosystem
-  visibility.** Hermes' skill selector is LLM-judged and not reliable
-  enough to be the only path. The skill body literally tells the agent
-  "the proxy already routed this turn — respond normally".
-- **Baseline is split from validate** (Option G). They run as separate
-  CLIs against a file seam so two LLMs never share GPU memory.
-- **Outgoing Telegram rides Hermes' `--deliver telegram` cron adapter**
-  proven by `notes/foundation-07/proof.md`. We don't ship
-  python-telegram-bot on the host.
-- **Every training & registry manifest is Ed25519-signed.** The validator
-  refuses to evaluate (`exit code 2`) an unsigned/forged training
-  manifest, and the proxy can verify registry manifests offline.
+## Known gaps
+
+- **No true multimodal** — text-only multi-base-model for v0.2. Image/audio specialist training deferred.
+- **Single GPU serialization** — orchestrator processes one training job per tick. Multi-GPU scheduling not implemented.
+- **Firecracker-only Hermes** — Docker Compose deployment available but not the default path.
+- **OpenRouter live verification pending** — E2E tested against mocks. See `notes/openrouter-live-verification.md`.
+- **Python 3.14 untested in CI** — pyproject constraints relaxed but no automated testing for 3.14 yet.
+
+## Testing
+
+```bash
+make test          # Go + Python
+make coverage      # Go + Python coverage reports
+make lint          # go vet
+```
+
+Go: `go test ./...` in proxy, dataset-builder, registry-service, burst.
+Python: `pytest tests/` in orchestrator, trainer, validator, serving, telegram.
 
 ## License
 
-Apache 2.0. Qwen2.5-1.5B-Instruct is Apache 2.0 too — clean for portfolio
-and contest submission.
+Apache 2.0. Qwen2.5-1.5B-Instruct is Apache 2.0 too — clean for portfolio and contest submission.

@@ -49,12 +49,14 @@ def _stop_warm_serve() -> None:
 
 
 def decide(cfg: Config) -> str:
-    """Resolve the placement for an autonomous run. 'cloud' is not yet wired
-    (burst untested), so it falls back to local with a warning."""
+    """Resolve the placement for an autonomous run."""
     if cfg.training_placement == "cloud":
-        LOG.warning("cloud placement requested but burst path is not yet wired "
-                    "(stretch/untested); running local")
-        return "local"
+        from .flash_burst import can_burst
+        tenant = getattr(cfg, "tenant_id", None) or "default"
+        decision = can_burst(cfg, tenant, cfg.burst_gpu)
+        if decision["allowed"]:
+            return "cloud"
+        LOG.warning("cloud placement requested but burst blocked: %s", decision["reasons"])
     return "local"
 
 

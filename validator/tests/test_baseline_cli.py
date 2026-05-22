@@ -46,7 +46,8 @@ def test_build_parser_baseline_model_default():
         "--test-dataset", "/tmp/a.jsonl.gz",
         "--output", "/tmp/b.jsonl",
     ])
-    assert "Qwen" in args.baseline_model
+    # Default is None (resolved at runtime from supported_models.yaml).
+    assert args.baseline_model is None
 
 
 def test_build_parser_max_tokens_default():

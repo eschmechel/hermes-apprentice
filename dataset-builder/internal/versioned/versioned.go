@@ -18,18 +18,25 @@ import (
 	"time"
 )
 
+// MergeSource records the pattern and record count for one parent in a merge.
+type MergeSource struct {
+	PatternID string `json:"pattern_id"`
+	Records   int    `json:"records"`
+}
+
 // Manifest captures metadata about one versioned dataset.
 type Manifest struct {
-	Version           int       `json:"version"`
-	PatternID         string    `json:"pattern_id"`
-	CreatedAt         time.Time `json:"created_at"`
-	SHA256            string    `json:"sha256"`
-	TrainCount        int       `json:"train_count"`
-	ValCount          int       `json:"val_count"`
-	TestCount         int       `json:"test_count"`
-	TotalCount        int       `json:"total_count"`
-	OriginalCount     int       `json:"original_count"`
-	AugmentationCount int       `json:"augmentation_count"`
+	Version           int           `json:"version"`
+	PatternID         string        `json:"pattern_id"`
+	CreatedAt         time.Time     `json:"created_at"`
+	SHA256            string        `json:"sha256"`
+	TrainCount        int           `json:"train_count"`
+	ValCount          int           `json:"val_count"`
+	TestCount         int           `json:"test_count"`
+	TotalCount        int           `json:"total_count"`
+	OriginalCount     int           `json:"original_count"`
+	AugmentationCount int           `json:"augmentation_count"`
+	MergedFrom        []MergeSource `json:"merged_from,omitempty"`
 }
 
 // Save copies train/val/test gzip files from workDir into

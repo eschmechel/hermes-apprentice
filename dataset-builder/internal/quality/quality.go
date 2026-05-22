@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 )
 
 var reaskPrefixes = []string{

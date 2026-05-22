@@ -8,8 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/hermes-apprentice/burst/internal/plan"
-	"github.com/hermes-apprentice/burst/internal/runner"
+	"github.com/eschmechel/hermes-apprentice/burst/internal/plan"
+	"github.com/eschmechel/hermes-apprentice/burst/internal/runner"
 	"github.com/spf13/cobra"
 )
 

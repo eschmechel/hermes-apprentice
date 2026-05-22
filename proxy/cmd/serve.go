@@ -10,11 +10,15 @@ import (
 
 	ort "github.com/yalue/onnxruntime_go"
 
-	"github.com/hermes-apprentice/proxy/internal/cost"
-	"github.com/hermes-apprentice/proxy/internal/embedder"
-	"github.com/hermes-apprentice/proxy/internal/httpapi"
-	"github.com/hermes-apprentice/proxy/internal/patterns"
-	"github.com/hermes-apprentice/proxy/internal/runpod"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/alias"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/canary"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/cost"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/embedder"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/httpapi"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/ratelimit"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/runpod"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/tenant"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +33,16 @@ func serveCmd() *cobra.Command {
 		ortLibPath     string
 		matchThreshold float64
 		shadowRate     float64
-		logFile        string
-		runpodAPIKey   string
+		logFile             string
+		runpodAPIKey        string
+		canaryStateDir      string
+		canaryRampStart     int
+		canaryRampStep      int
+		canaryStepRequests  int
+		canaryAgreeThresh   float64
+		tenantRoot          string
+		globalAPIKey        string
+		tenantRPM           int
 	)
 
 	cmd := &cobra.Command{
@@ -110,6 +122,28 @@ chat-completions schema, so request and response shapes are unchanged.`,
 
 			metrics := httpapi.NewMetrics()
 
+			var cm *canary.Manager
+			if canaryStateDir != "" {
+				canaryCfg := canary.Config{
+					StartPct:        canaryRampStart,
+					StepPct:         canaryRampStep,
+					StepRequests:    canaryStepRequests,
+					AgreementThresh: canaryAgreeThresh,
+				}
+				cm, err = canary.New(filepath.Join(canaryStateDir, "canary.json"), canaryCfg)
+				if err != nil {
+					logger.Warn("canary manager init failed; canary disabled", "err", err)
+					cm = nil
+				} else {
+					logger.Info("canary manager loaded",
+						"start_pct", canaryRampStart,
+						"step_pct", canaryRampStep,
+						"step_requests", canaryStepRequests,
+						"agreement_threshold", canaryAgreeThresh,
+					)
+				}
+			}
+
 			var rpClient *runpod.Client
 			if runpodAPIKey != "" {
 				rpClient = runpod.New(runpodAPIKey)
@@ -119,6 +153,29 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				} else {
 					logger.Info("RunPod client connected")
 				}
+			}
+
+			aliasStore, err := alias.Open(filepath.Join(stateDir, "aliases.json"))
+			if err != nil {
+				logger.Warn("alias store init failed; alias resolution disabled", "err", err)
+				aliasStore = nil
+			}
+
+			var ts *tenant.Store
+			if tenantRoot != "" {
+				ts, err = tenant.Open(tenant.Config{TenantRoot: tenantRoot, GlobalKey: globalAPIKey})
+				if err != nil {
+					logger.Warn("tenant store init failed; auth disabled", "err", err)
+					ts = nil
+				} else {
+					logger.Info("tenant auth enabled", "tenant_root", tenantRoot)
+				}
+			}
+
+			var rl *ratelimit.Limiter
+			if tenantRPM > 0 {
+				rl = ratelimit.New(tenantRPM)
+				logger.Info("rate limiting enabled", "rpm", tenantRPM)
 			}
 
 			srv := httpapi.New(httpapi.Config{
@@ -131,11 +188,15 @@ chat-completions schema, so request and response shapes are unchanged.`,
 				PatternStore:   store,
 				MatchThreshold: float32(matchThreshold),
 				ShadowRate:     shadowRate,
+				AliasStore:     aliasStore,
+				CanaryManager:  cm,
 				LatencyTracker: latencyTracker,
 				Pricing:        pricing,
 				Metrics:        metrics,
 				StateDir:       stateDir,
 				RunPodClient:   rpClient,
+				TenantStore:    ts,
+				RateLimiter:    rl,
 			})
 
 			return srv.ListenAndServe(ctx)
@@ -152,5 +213,13 @@ chat-completions schema, so request and response shapes are unchanged.`,
 	cmd.Flags().Float64Var(&shadowRate, "shadow-rate", 0.05, "Fraction of matched requests to also send to upstream for shadow comparison (0..1)")
 	cmd.Flags().StringVar(&logFile, "log-file", "", "Write JSON request log to file in addition to stderr (default: no file)")
 	cmd.Flags().StringVar(&runpodAPIKey, "runpod-api-key", "", "RunPod API key for live pod cost tracking (enables /api/cost/runpod)")
+	cmd.Flags().StringVar(&canaryStateDir, "canary-state-dir", stateDir, "Canary state directory (defaults to --state-dir)")
+	cmd.Flags().IntVar(&canaryRampStart, "canary-ramp-start", 5, "Canary ramp starting percentage (1-50)")
+	cmd.Flags().IntVar(&canaryRampStep, "canary-ramp-step", 10, "Canary ramp step percentage increment")
+	cmd.Flags().IntVar(&canaryStepRequests, "canary-ramp-step-requests", 50, "Requests per canary step before evaluating")
+	cmd.Flags().Float64Var(&canaryAgreeThresh, "canary-agreement-threshold", 0.8, "Minimum agreement ratio for canary advancement (0..1)")
+	cmd.Flags().StringVar(&tenantRoot, "tenant-root", "", "Tenant root directory (~/.apprentice/tenants); empty = auth disabled")
+	cmd.Flags().StringVar(&globalAPIKey, "global-api-key", "", "Admin API key for global pattern management")
+	cmd.Flags().IntVar(&tenantRPM, "tenant-ratelimit-rpm", 0, "Per-tenant rate limit in requests/minute (0 = disabled)")
 	return cmd
 }

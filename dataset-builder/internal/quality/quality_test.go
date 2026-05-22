@@ -3,7 +3,7 @@ package quality
 import (
 	"testing"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 )
 
 func TestFilter_Empty(t *testing.T) {

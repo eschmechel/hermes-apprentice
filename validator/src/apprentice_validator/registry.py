@@ -104,16 +104,31 @@ def promote(
         shutil.copy2(sig_src, dest / f"{MANIFEST_SOURCE}.sig")
     copied += 2 if sig_src.exists() else 1
 
+    # Read base_model and merge lineage from the training manifest.
+    base_model: str = "unknown"
+    merged_from: list[dict[str, Any]] | None = None
+    try:
+        with open(training_manifest, "r", encoding="utf-8") as f:
+            tm = json.load(f)
+        base_model = tm.get("base_model", base_model)
+        merged_from = tm.get("merged_from")
+    except (OSError, json.JSONDecodeError) as e:
+        LOG.warning("could not read training manifest",
+                    extra={"path": str(training_manifest), "error": str(e)})
+
     # Write registry manifest.
-    manifest = {
+    manifest: dict[str, Any] = {
         "schema_version": 1,
         "pattern_id": pattern_id,
         "version": new_version,
         "promoted_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "base_model": base_model,
         "model_dir": str(dest.resolve()),
         "scores": scores,
         "source_training_manifest": str(training_manifest.resolve()),
     }
+    if merged_from:
+        manifest["merged_from"] = merged_from
     reg_manifest_path = dest / REGISTRY_MANIFEST
     payload = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     reg_manifest_path.write_text(payload, encoding="utf-8")

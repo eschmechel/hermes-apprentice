@@ -14,3 +14,15 @@
 .DS_Store
 *.pyc
 __pycache__/
+*.log
+graphify-out/
+*.onnx
+*.pb
+.claude/
+CLAUDE.md
+.coverage
+unsloth_compiled_cache/
+PLAN.md
+docs/devto-article.md
+notes/
+

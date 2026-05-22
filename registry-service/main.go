@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hermes-apprentice/registry-service/cmd"
+	"github.com/eschmechel/hermes-apprentice/registry-service/cmd"
 )
 
 func main() {

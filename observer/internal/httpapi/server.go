@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hermes-apprentice/observer/internal/store"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/store"
 )
 
 type Config struct {

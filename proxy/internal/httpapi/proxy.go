@@ -14,13 +14,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/alias"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/canary"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/ratelimit"
 )
 
 type proxyHandler struct {
 	upstreamURL    string
-	serveURL       string // warm multi-LoRA vLLM; empty => legacy per-pattern SpecialistURL
-	residencyURL   string // residency control plane (ensure adapter resident)
+	serveURL       string
+	residencyURL   string
 	client         *http.Client
 	embedder       Embedder
 	store          *patterns.Store
@@ -28,9 +31,12 @@ type proxyHandler struct {
 	shadowRate     float64
 	logger         *slog.Logger
 
+	aliasStore     *alias.Store
+	canaryManager  *canary.Manager
 	latencyTracker *LatencyTracker
 	pricing        CostEstimator
 	metrics        *Metrics
+	rateLimiter    *ratelimit.Limiter
 
 	rand func() float64
 }
@@ -45,10 +51,13 @@ func newProxyHandler(cfg Config) *proxyHandler {
 		store:          cfg.PatternStore,
 		matchThreshold: cfg.MatchThreshold,
 		shadowRate:     cfg.ShadowRate,
+		aliasStore:     cfg.AliasStore,
+		canaryManager:  cfg.CanaryManager,
 		logger:         cfg.Logger,
 		latencyTracker: cfg.LatencyTracker,
 		pricing:        cfg.Pricing,
 		metrics:        cfg.Metrics,
+		rateLimiter:    cfg.RateLimiter,
 		rand:           rand.Float64,
 	}
 }
@@ -74,6 +83,16 @@ func (h *proxyHandler) handleChatCompletions(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	// Enforce per-tenant rate limit.
+	if h.rateLimiter != nil {
+		tenantID := TenantFromContext(r.Context())
+		if !h.rateLimiter.Allow(tenantID) {
+			h.logger.Warn("rate limit exceeded", "tenant", tenantID)
+			writeError(w, http.StatusTooManyRequests, "rate limit exceeded")
+			return
+		}
+	}
+
 	peek, peekErr := peekChat(body)
 	if peekErr != nil {
 		h.forwardToUpstream(w, r, body, "peek_failed", "", false)
@@ -97,9 +116,32 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		h.logger.Warn("embed failed; falling back to upstream", "err", err)
 		return false, "embed_failed"
 	}
-	match, ok := h.store.BestMatch(emb, h.matchThreshold)
+	tenantID := TenantFromContext(r.Context())
+	match, ok := h.store.BestMatchTenant(emb, h.matchThreshold, tenantID)
 	if !ok {
 		return false, "no_match"
+	}
+
+	// Resolve aliases — if the matched pattern has been merged into a
+	// consolidated pattern, route to the merged target instead.
+	patternID := match.Pattern.ID
+	if h.aliasStore != nil {
+		if targetID, ok := h.aliasStore.Resolve(match.Pattern.ID); ok {
+			patternID = targetID
+			h.logger.Debug("alias resolved",
+				"from", match.Pattern.ID, "to", targetID)
+		}
+	}
+
+	// Check canary decision for this pattern.
+	canaryRoute, canaryManaged := false, false
+	if h.canaryManager != nil {
+		canaryRoute, canaryManaged = h.canaryManager.Decision(patternID)
+		if canaryManaged && !canaryRoute {
+			h.logger.Debug("canary: routing to upstream",
+				"pattern_id", patternID)
+			return false, "canary_upstream"
+		}
 	}
 
 	// Resolve the specialist target. Multi-LoRA mode (serveURL set): ensure the
@@ -108,23 +150,29 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	routeBody := body
 	destURL := strings.TrimRight(match.Pattern.SpecialistURL, "/") + "/v1/chat/completions"
 	if h.serveURL != "" {
-		if err := h.ensureAdapter(r.Context(), match.Pattern.ID); err != nil {
+		if err := h.ensureAdapter(r.Context(), patternID); err != nil {
 			h.logger.Warn("residency ensure failed; falling back to upstream",
-				"pattern_id", match.Pattern.ID, "err", err)
+				"pattern_id", patternID, "err", err)
 			return false, "specialist_ensure_failed"
 		}
-		if rb, rerr := rewriteModel(body, match.Pattern.ID); rerr == nil {
+		if rb, rerr := rewriteModel(body, patternID); rerr == nil {
 			routeBody = rb
 		} else {
 			h.logger.Warn("model rewrite failed; routing original body",
-				"pattern_id", match.Pattern.ID, "err", rerr)
+				"pattern_id", patternID, "err", rerr)
 		}
 		destURL = h.serveURL + "/v1/chat/completions"
 	}
 
+	// For canary-managed patterns, always shadow to upstream so we can
+	// compute agreement scores. Otherwise use the configured shadow rate.
+	shadowRate := h.shadowRate
+	if canaryManaged {
+		shadowRate = 1.0
+	}
 	var shadow *shadowJob
-	if h.shadowRate > 0 && h.rand() < h.shadowRate {
-		shadow = h.startShadow(r, body, match.Pattern.ID, hashInput(lastUser))
+	if shadowRate > 0 && h.rand() < shadowRate {
+		shadow = h.startShadow(r, body, patternID, hashInput(lastUser))
 	}
 
 	specStart := time.Now()
@@ -132,7 +180,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	specLatency := time.Since(specStart)
 	if err != nil {
 		h.logger.Warn("specialist call failed; falling back to upstream",
-			"pattern_id", match.Pattern.ID,
+			"pattern_id", patternID,
 			"specialist_url", match.Pattern.SpecialistURL,
 			"err", err,
 		)
@@ -146,7 +194,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	resp.Body.Close()
 	if readErr != nil {
 		h.logger.Warn("specialist body read failed; falling back to upstream",
-			"pattern_id", match.Pattern.ID, "err", readErr)
+			"pattern_id", patternID, "err", readErr)
 		if shadow != nil {
 			shadow.discard()
 		}
@@ -155,7 +203,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 
 	if !specialistResponseOK(resp.StatusCode, specBody) {
 		h.logger.Warn("specialist returned bad response; falling back to upstream",
-			"pattern_id", match.Pattern.ID,
+			"pattern_id", patternID,
 			"status", resp.StatusCode,
 		)
 		if shadow != nil {
@@ -169,7 +217,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	_, _ = w.Write(specBody)
 
 	h.logger.Info("specialist served request",
-		"pattern_id", match.Pattern.ID,
+		"pattern_id", patternID,
 		"similarity", match.Similarity,
 		"latency_ms", specLatency.Milliseconds(),
 	)
@@ -192,9 +240,50 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	}
 
 	if shadow != nil {
-		go shadow.finish(specBody, specLatency)
+		if canaryManaged && h.canaryManager != nil {
+			go h.finishCanaryShadow(shadow, match.Pattern.ID, specBody, specLatency)
+		} else {
+			go shadow.finish(specBody, specLatency)
+		}
 	}
 	return true, "specialist"
+}
+
+func (h *proxyHandler) finishCanaryShadow(shadow *shadowJob, patternID string, specialistBody []byte, specialistLatency time.Duration) {
+	<-shadow.done
+	shadow.cancel()
+
+	specContent := canary.ExtractContent(specialistBody)
+	upContent := canary.ExtractContent(shadow.body)
+	score := canary.CompareResponses(specialistBody, shadow.body)
+
+	// Log agreement data for external analysis.
+	h.logger.Info("canary_agreement",
+		"pattern_id", patternID,
+		"agreement", score,
+		"input_hash", shadow.inputHash,
+		"specialist_latency_ms", specialistLatency.Milliseconds(),
+		"upstream_latency_ms", shadow.latency.Milliseconds(),
+		"specialist_output_length", len(specContent),
+		"upstream_output_length", len(upContent),
+	)
+
+	state, transitioned, err := h.canaryManager.Advance(patternID, score)
+	if err != nil {
+		h.logger.Warn("canary advance failed", "pattern_id", patternID, "err", err)
+		return
+	}
+	if transitioned {
+		if state == canary.StateBroken {
+			alert := h.canaryManager.SendAlert(patternID)
+			h.logger.Warn("canary auto-demoted", "pattern_id", patternID, "alert", alert)
+		} else if state == canary.StateLive {
+			h.logger.Info("canary promoted to live", "pattern_id", patternID)
+		} else {
+			r, _ := h.canaryManager.State(patternID)
+			h.logger.Info("canary advanced", "pattern_id", patternID, "pct", r.Pct)
+		}
+	}
 }
 
 func (h *proxyHandler) forwardToUpstream(w http.ResponseWriter, r *http.Request, body []byte, reason string, model string, isFallback bool) {

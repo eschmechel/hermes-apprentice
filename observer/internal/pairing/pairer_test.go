@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hermes-apprentice/observer/internal/normalizer"
-	"github.com/hermes-apprentice/observer/internal/store"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/normalizer"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/store"
 	_ "modernc.org/sqlite"
 )
 

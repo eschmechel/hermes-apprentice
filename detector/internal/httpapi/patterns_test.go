@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/hermes-apprentice/detector/internal/patternstore"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/patternstore"
 )
 
 func TestGetPatterns_Empty(t *testing.T) {

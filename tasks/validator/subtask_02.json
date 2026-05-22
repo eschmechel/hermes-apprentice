@@ -2,7 +2,7 @@
   "id": "validator-02",
   "seq": "02",
   "title": "Implement baseline runner: same test set through few-shot prompt on raw Qwen2.5-1.5B",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

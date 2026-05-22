@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/hermes-apprentice/proxy/internal/runpod"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/runpod"
 )
 
 type costHandler struct {

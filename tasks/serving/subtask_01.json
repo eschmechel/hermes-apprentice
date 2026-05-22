@@ -2,7 +2,7 @@
   "id": "serving-01",
   "seq": "01",
   "title": "Install vLLM, stand up server with merged Qwen2.5-1.5B",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": false,
   "suggested_agent": "CoderAgent",

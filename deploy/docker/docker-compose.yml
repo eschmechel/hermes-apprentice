@@ -1,0 +1,116 @@
+# Apprentice v0.2 — Docker isolation profile.
+#
+# Runs the full specialist-training stack in containers. The GPU is given only
+# to the `serve` container (warm multi-LoRA vLLM base). Hermes itself needs
+# no GPU. Prometheus + Grafana are optional; enable with `compose.monitoring.yml`.
+#
+#   docker compose -f deploy/docker/docker-compose.yml up -d
+#
+# Set APPRENTICE_GUEST_BACKEND=docker in ~/.apprentice/.env so
+# apprentice-validate pushes skills to the Hermes container.
+
+name: apprentice
+
+networks:
+  apprentice:
+    driver: bridge
+
+volumes:
+  apprentice-state:
+  hermes-state:
+
+services:
+  hermes:
+    image: ${HERMES_IMAGE:-nousresearch/hermes-agent:latest}
+    container_name: hermes
+    restart: always
+    networks: [apprentice]
+    volumes:
+      - hermes-state:/root/.hermes
+    environment:
+      - OPENAI_BASE_URL=http://proxy:8083/v1
+
+  serve:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.serve
+    container_name: apprentice-serve
+    restart: always
+    networks: [apprentice]
+    volumes:
+      - apprentice-state:/root/.apprentice
+    command: ["apprentice-serve", "--enable-lora", "--max-loras", "4",
+              "--gpu-memory-utilization", "0.80", "--port", "8000"]
+    environment:
+      - APPRENTICE_REGISTRY_ROOT=/root/.apprentice/registry
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  observer:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.observer
+    container_name: apprentice-observer
+    restart: always
+    networks: [apprentice]
+    volumes:
+      - apprentice-state:/root/.apprentice
+      - hermes-state:/root/.hermes:ro
+    command: ["observer", "serve", "--source", "hermes",
+              "--hermes-db", "/root/.hermes/state.db", "--listen", ":8080"]
+
+  proxy:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.proxy
+    container_name: apprentice-proxy
+    restart: always
+    networks: [apprentice]
+    ports:
+      - "8083:8083"
+    volumes:
+      - apprentice-state:/root/.apprentice
+    command:
+      - "proxy"
+      - "serve"
+      - "--listen", ":8083"
+      - "--serve-url", "http://serve:8000"
+      - "--residency-url", "http://serve:8071"
+      - "--upstream-url", "${UPSTREAM_URL:-https://openrouter.ai/api/v1}"
+      - "--canary-state-dir", "/root/.apprentice/proxy/canary"
+      - "--tenant-root", "/root/.apprentice/tenants"
+      - "--global-api-key", "${APPRENTICE_GLOBAL_API_KEY:-}"
+      - "--tenant-ratelimit-rpm", "60"
+      - "--runpod-api-key", "${RUNPOD_API_KEY:-}"
+
+  registry:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.registry
+    container_name: apprentice-registry
+    restart: always
+    networks: [apprentice]
+    ports:
+      - "8082:8082"
+    volumes:
+      - apprentice-state:/root/.apprentice
+    command: ["registry-service", "--registry-root", "/root/.apprentice/registry",
+              "--listen", ":8082"]
+
+  burst:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.burst
+    container_name: apprentice-burst
+    restart: always
+    networks: [apprentice]
+    volumes:
+      - apprentice-state:/root/.apprentice
+    environment:
+      - APPRENTICE_ROOT=/root/.apprentice
+      - RUNPOD_API_KEY=${RUNPOD_API_KEY:-}

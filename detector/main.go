@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hermes-apprentice/detector/cmd"
+	"github.com/eschmechel/hermes-apprentice/detector/cmd"
 )
 
 func main() {

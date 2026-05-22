@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/hermes-apprentice/proxy/internal/summary"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/summary"
 	"github.com/spf13/cobra"
 )
 

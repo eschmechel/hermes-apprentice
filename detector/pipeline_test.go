@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hermes-apprentice/detector/internal/clusterer"
-	"github.com/hermes-apprentice/detector/internal/dedupstore"
-	"github.com/hermes-apprentice/detector/internal/embedder"
-	"github.com/hermes-apprentice/detector/internal/hasher"
-	"github.com/hermes-apprentice/detector/internal/httpapi"
-	"github.com/hermes-apprentice/detector/internal/patternstore"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/clusterer"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/dedupstore"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/embedder"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/hasher"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/httpapi"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/patternstore"
 
 	ort "github.com/yalue/onnxruntime_go"
 )

@@ -2,7 +2,7 @@
   "id": "validator-04",
   "seq": "04",
   "title": "Implement promotion gate: specialist ≥ baseline + 10 AND specialist ≥ teacher - 5",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["03"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

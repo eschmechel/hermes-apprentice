@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/hermes-apprentice/observer/internal/store"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/store"
 )
 
 func makeStore(t *testing.T) *store.Store {

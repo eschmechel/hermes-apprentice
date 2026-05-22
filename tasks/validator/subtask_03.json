@@ -2,7 +2,7 @@
   "id": "validator-03",
   "seq": "03",
   "title": "Compute exact-match and F1 scores for specialist and baseline",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01", "02"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

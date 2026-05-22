@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/hermes-apprentice/detector/internal/patternstore"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/patternstore"
 )
 
 type Config struct {

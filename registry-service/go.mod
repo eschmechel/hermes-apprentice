@@ -1,4 +1,4 @@
-module github.com/hermes-apprentice/registry-service
+module github.com/eschmechel/hermes-apprentice/registry-service
 
 go 1.26.3
 

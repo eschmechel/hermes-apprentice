@@ -93,6 +93,7 @@ def test_parser_defaults_match_acceptance():
     args = t.build_parser().parse_args([
         "--dataset-dir", "/tmp/ds",
         "--output-dir", "/tmp/out",
+        "--base-model", "unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
     ])
     # Acceptance: LoRA rank 16, base model Qwen2.5-1.5B-Instruct.
     assert args.lora_rank == 16

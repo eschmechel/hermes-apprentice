@@ -18,11 +18,15 @@ import (
 // Pattern is one routable entry: a centroid (BGE-small 384-dim) plus the
 // specialist endpoint to use when an incoming request's embedding cosines
 // above the proxy's match threshold against the centroid.
+//
+// TenantID identifies which tenant this pattern belongs to.  Empty means
+// "global" — visible to all tenants.
 type Pattern struct {
 	ID            string    `json:"id"`
 	Description   string    `json:"description"`
 	Centroid      []float32 `json:"centroid"`
 	SpecialistURL string    `json:"specialist_url"`
+	TenantID      string    `json:"tenant_id,omitempty"` // empty = global
 }
 
 // Match is the result of matching an embedding against the store.
@@ -101,6 +105,46 @@ func (s *Store) List() []Pattern {
 		out = append(out, p)
 	}
 	return out
+}
+
+// ListByTenant returns patterns visible to a tenant (own patterns + global ones).
+func (s *Store) ListByTenant(tenantID string) []Pattern {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]Pattern, 0, len(s.data))
+	for _, p := range s.data {
+		if p.TenantID == "" || p.TenantID == tenantID {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// BestMatchTenant works like BestMatch but only considers patterns visible to
+// the given tenant (own patterns + global ones).
+func (s *Store) BestMatchTenant(embedding []float32, threshold float32, tenantID string) (Match, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var best Match
+	found := false
+	for _, p := range s.data {
+		if p.TenantID != "" && p.TenantID != tenantID {
+			continue
+		}
+		if len(p.Centroid) != len(embedding) {
+			continue
+		}
+		sim := cosine(embedding, p.Centroid)
+		if sim < threshold {
+			continue
+		}
+		if !found || sim > best.Similarity {
+			best = Match{Pattern: p, Similarity: sim}
+			found = true
+		}
+	}
+	return best, found
 }
 
 // BestMatch returns the highest-similarity pattern at or above threshold.

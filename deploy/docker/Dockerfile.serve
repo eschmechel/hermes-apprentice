@@ -1,0 +1,25 @@
+# Apprentice serve venv (vLLM multi-LoRA). Build context = repo root.
+# Reproduces ~/.apprentice/venv-serve from the W0 lock, then installs the serving
+# + validator packages editable. Needs an NVIDIA base + the container runtime's
+# GPU support (see docker-compose.yml `deploy.resources.reservations.devices`).
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-venv curl ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+# uv for reproducible installs.
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+WORKDIR /src
+COPY deploy/locks/serve.lock deploy/locks/serve.lock
+RUN uv venv /opt/venv-serve
+ENV VIRTUAL_ENV=/opt/venv-serve PATH=/opt/venv-serve/bin:$PATH
+RUN uv pip install --python /opt/venv-serve/bin/python -r deploy/locks/serve.lock
+
+COPY serving/ serving/
+COPY validator/ validator/
+COPY trainer/ trainer/
+RUN uv pip install --python /opt/venv-serve/bin/python -e ./trainer -e ./validator -e ./serving
+
+ENTRYPOINT []

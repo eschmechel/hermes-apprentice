@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"testing"
 
-	"github.com/hermes-apprentice/observer/internal/poller"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/poller"
 )
 
 func nullStr(s string) sql.NullString { return sql.NullString{String: s, Valid: true} }

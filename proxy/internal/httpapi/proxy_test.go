@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/patterns"
 )
 
 // fakeEmbedder returns a configurable vector for each call.  Lets us drive

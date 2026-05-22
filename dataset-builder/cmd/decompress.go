@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/versioned"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/versioned"
 	"github.com/spf13/cobra"
 )
 

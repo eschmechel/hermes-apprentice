@@ -1,0 +1,13 @@
+{
+  "extends": ["@commitlint/config-conventional"],
+  "rules": {
+    "scope-enum": [2, "always", [
+      "foundation", "observer", "detector", "dataset-builder", "trainer",
+      "serving", "validator", "proxy", "skill", "instrumentation", "telegram",
+      "orchestrator", "demo", "docs", "ci", "build", "burst"
+    ]],
+    "type-enum": [2, "always", [
+      "feat", "fix", "docs", "chore", "refactor", "test", "ci", "build", "perf"
+    ]]
+  }
+}

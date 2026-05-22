@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hermes-apprentice/burst/internal/plan"
+	"github.com/eschmechel/hermes-apprentice/burst/internal/plan"
 )
 
 func TestRun_DryRunPrintsAllAndExecutesNone(t *testing.T) {

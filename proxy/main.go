@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hermes-apprentice/proxy/cmd"
+	"github.com/eschmechel/hermes-apprentice/proxy/cmd"
 )
 
 func main() {

@@ -27,8 +27,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hermes-apprentice/observer/internal/normalizer"
-	"github.com/hermes-apprentice/observer/internal/store"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/normalizer"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/store"
 )
 
 type Pairer struct {

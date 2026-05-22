@@ -29,6 +29,8 @@ import logging
 import time
 from pathlib import Path
 
+from apprentice_trainer import models
+
 from . import baseline_io, baseline_runner, test_runner
 from .logging import setup_logging
 
@@ -45,8 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Path to test.jsonl.gz (from dataset-builder splitter).")
     p.add_argument("--output", required=True,
                    help="Where to write the baseline pairs JSONL.")
-    p.add_argument("--baseline-model", default=baseline_runner.DEFAULT_BASE_MODEL,
-                   help=f"HF model id (default: {baseline_runner.DEFAULT_BASE_MODEL}).")
+    p.add_argument("--baseline-model", default=None,
+                   help="HF model id (default: the entry marked default: true in "
+                        "supported_models.yaml). Use --list-models to see available models.")
+    p.add_argument("--list-models", action="store_true",
+                   help="Print available base models and exit.")
     p.add_argument("--max-tokens", type=int, default=256,
                    help="Max tokens for inference (default: 256).")
     p.add_argument("--gpu-memory-utilization", type=float, default=0.90,
@@ -63,6 +68,15 @@ def main(argv: list[str] | None = None) -> int:
 
     test_dataset = Path(args.test_dataset).expanduser().resolve()
     output = Path(args.output).expanduser().resolve()
+
+    if args.list_models:
+        for m in models.list_models():
+            default_mark = " (default)" if m.get("default") else ""
+            print(f"  {m['id']}{default_mark}")
+        return 0
+
+    resolved_base = models.resolve_model(args.baseline_model, load_in_4bit=False)
+    args.baseline_model = resolved_base
 
     if args.check_only:
         try:

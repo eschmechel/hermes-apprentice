@@ -11,6 +11,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from apprentice_trainer import models as trainer_models
+
 
 def apprentice_root() -> Path:
     return Path(os.environ.get("APPRENTICE_ROOT", Path.home() / ".apprentice")).expanduser()
@@ -26,7 +28,7 @@ class Config:
     """Tunables for a pipeline run. Defaults match the validated demo run."""
 
     root: Path = field(default_factory=apprentice_root)
-    base_model: str = field(default_factory=lambda: _env("APPRENTICE_BASE_MODEL", "unsloth/Qwen2.5-1.5B-Instruct"))
+    base_model: str = field(default_factory=lambda: _resolve_base_model())
     # apprentice-train --profile (a YAML path). If None we omit the flag and let
     # the trainer fall back to APPRENTICE_TRAINER_PROFILE / its own defaults.
     train_profile: str | None = field(default_factory=lambda: _env("APPRENTICE_TRAIN_PROFILE"))
@@ -35,6 +37,11 @@ class Config:
     # dataset-builder knobs (only used when we build a dataset rather than reuse one)
     observer_url: str | None = field(default_factory=lambda: _env("APPRENTICE_OBSERVER_URL"))
     presidio_url: str | None = field(default_factory=lambda: _env("APPRENTICE_PRESIDIO_URL"))
+    proxy_url: str = field(default_factory=lambda: _env("APPRENTICE_PROXY_URL", "http://localhost:8083"))
+    monthly_budget_usd: float = field(default_factory=lambda: float(
+        _env("APPRENTICE_MONTHLY_BUDGET_USD", "20.0")))
+    burst_gpu: str = field(default_factory=lambda: _env("APPRENTICE_BURST_GPU", "A100"))
+    tenant_id: str | None = field(default_factory=lambda: _env("APPRENTICE_TENANT_ID"))
 
     # Placement policy (VRAM arbiter). Autonomous runs use these without
     # blocking; interactive surfaces may override per-run (stretch).
@@ -98,6 +105,14 @@ class Config:
     @property
     def patterns_dir(self) -> Path:
         return self.root / "patterns"
+
+
+def _resolve_base_model() -> str:
+    """Resolve APPRENTICE_BASE_MODEL (alias or full ID), falling back to default."""
+    raw = _env("APPRENTICE_BASE_MODEL")
+    if raw is None:
+        return trainer_models.get_default_model()
+    return trainer_models.resolve_model(raw, load_in_4bit=False)
 
 
 def latest_version_dir(parent: Path) -> Path | None:

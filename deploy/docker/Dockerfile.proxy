@@ -1,0 +1,16 @@
+# Apprentice proxy (Go). Build context = repo root.
+FROM golang:1.26-bookworm AS build
+WORKDIR /src/proxy
+COPY proxy/go.mod proxy/go.sum ./
+RUN go mod download
+COPY proxy/ ./
+# onnxruntime_go dlopen's libonnxruntime at runtime; the build itself is pure Go.
+RUN CGO_ENABLED=0 go build -o /out/proxy .
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+# Mount/copy libonnxruntime.so + the BGE-small model for embedding routing; the
+# proxy degrades to pass-through (logs a warning) when the model is absent.
+COPY --from=build /out/proxy /usr/local/bin/proxy
+ENTRYPOINT ["proxy"]

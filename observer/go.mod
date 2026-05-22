@@ -1,4 +1,4 @@
-module github.com/hermes-apprentice/observer
+module github.com/eschmechel/hermes-apprentice/observer
 
 go 1.26.3
 

@@ -2,7 +2,7 @@
   "id": "validator-07",
   "seq": "07",
   "title": "Expose HTTP endpoint GET /registry/<skill-id>/latest for proxy to query",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["06"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

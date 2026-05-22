@@ -2,7 +2,7 @@
   "id": "validator-01",
   "seq": "01",
   "title": "Implement test runner: load test JSONL, run through vLLM specialist endpoint",
-  "status": "pending",
+  "status": "completed",
   "depends_on": [],
   "parallel": false,
   "suggested_agent": "CoderAgent",

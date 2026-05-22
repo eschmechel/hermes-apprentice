@@ -2,7 +2,7 @@
 name = "apprentice-orchestrator"
 version = "0.1.0"
 description = "Apprentice orchestrator: consume training approvals and drive dataset-builder -> train -> merge -> validate -> promote across the train/serve venvs."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.15"
 
 # correlation_id (cid<->pattern) and the failure-notification path come from
 # apprentice-telegram; co-install it editable (uv pip install -e ./telegram).

@@ -15,6 +15,7 @@ directory under ~/.apprentice/datasets/<pattern-id>/v<n>/.`,
 		SilenceUsage: true,
 	}
 	root.AddCommand(buildCmd())
+	root.AddCommand(mergeCmd())
 	root.AddCommand(decompressCmd())
 	root.AddCommand(versionCmd())
 	return root

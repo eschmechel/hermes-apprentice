@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/hermes-apprentice/dataset-builder/cmd"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/cmd"
 )
 
 func main() {

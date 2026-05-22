@@ -2,7 +2,7 @@
   "id": "serving-03",
   "seq": "03",
   "title": "Measure and document inference latency on 2080 Ti for merged 1.5B model",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

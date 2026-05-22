@@ -1,0 +1,30 @@
+name: Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - run: make coverage-go
+      - run: pip install -e orchestrator -e trainer -e validator -e serving -e telegram 'pytest-cov>=6'
+      - run: |
+          for pkg in orchestrator trainer validator; do
+            cd "$pkg" && python -m pytest tests/ -q --cov --cov-report=xml
+          done
+
+      - uses: orgoro/coverage-action@v3
+        with:
+          coverageFile: "**/coverage.xml"
+          threshold: 60

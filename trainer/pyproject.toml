@@ -3,7 +3,7 @@ name = "apprentice-trainer"
 version = "0.1.0"
 description = "Apprentice trainer: Unsloth QLoRA fine-tuning of Qwen2.5-1.5B-Instruct from observer datasets."
 readme = "README.md"
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.15"
 
 # Lightweight deps only — Unsloth + torch + bitsandbytes are CUDA-specific and
 # installed separately. See README.md for the `uv pip install` command that

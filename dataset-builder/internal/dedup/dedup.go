@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 )
 
 const DefaultThreshold = 0.85

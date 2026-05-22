@@ -2,7 +2,7 @@
 name = "apprentice-telegram"
 version = "0.1.0"
 description = "Apprentice Telegram glue: templates, outbox, reply polling for cron-driven delivery."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.15"
 
 # python-telegram-bot is only needed for the reply-poller path (Telegram
 # getUpdates calls). Outgoing delivery rides Hermes' own cron --deliver

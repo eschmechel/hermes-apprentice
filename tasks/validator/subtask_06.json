@@ -2,7 +2,7 @@
   "id": "validator-06",
   "seq": "06",
   "title": "On fail: write failure report with scores, dataset info, suggested action",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["04"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

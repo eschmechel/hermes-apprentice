@@ -14,11 +14,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from apprentice_trainer import models
+
 from . import test_runner
 
 LOG = logging.getLogger("apprentice_validator.baseline")
 
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+DEFAULT_BASE_MODEL = models.get_default_model()
 
 Pair = dict[str, Any]
 

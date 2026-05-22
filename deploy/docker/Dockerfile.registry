@@ -1,0 +1,13 @@
+# Apprentice registry service (Go). Build context = repo root.
+FROM golang:1.26-bookworm AS build
+WORKDIR /src/registry-service
+COPY registry-service/go.mod registry-service/go.sum ./
+RUN go mod download
+COPY registry-service/ ./
+RUN CGO_ENABLED=0 go build -o /out/registry-service .
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /out/registry-service /usr/local/bin/registry-service
+ENTRYPOINT ["registry-service"]

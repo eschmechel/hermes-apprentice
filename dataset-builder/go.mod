@@ -1,4 +1,4 @@
-module github.com/hermes-apprentice/dataset-builder
+module github.com/eschmechel/hermes-apprentice/dataset-builder
 
 go 1.26.3
 

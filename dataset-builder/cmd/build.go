@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/augment"
-	"github.com/hermes-apprentice/dataset-builder/internal/dedup"
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
-	"github.com/hermes-apprentice/dataset-builder/internal/quality"
-	"github.com/hermes-apprentice/dataset-builder/internal/redact"
-	"github.com/hermes-apprentice/dataset-builder/internal/splitter"
-	"github.com/hermes-apprentice/dataset-builder/internal/versioned"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/augment"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/dedup"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/quality"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/redact"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/splitter"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/versioned"
 	"github.com/spf13/cobra"
 )
 

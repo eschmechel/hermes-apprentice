@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hermes-apprentice/dataset-builder/internal/fetcher"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 )
 
 const (

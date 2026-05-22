@@ -1,0 +1,41 @@
+# supported_models.yaml — User-editable registry of base models for specialist
+# training.  The apprentice-train --list-models flag prints the entries below.
+#
+# Each entry:
+#   id            — HuggingFace model ID used for inference (baseline, merged).
+#   quantized_id  — Optional: 4-bit bnb-prequantized variant for QLoRA training.
+#                   When load_in_4bit is True the trainer uses this instead of id.
+#   default       — One entry with default: true is auto-selected when no
+#                   --base-model is given.
+#   min_vram_gb   — Rough minimum GPU memory for QLoRA training at rank 16,
+#                   batch_size 2, seq_len 2048.
+#   license       — SPDX or known license identifier.
+#   recommended_profile — Optional profile name hint.
+
+base_models:
+  - id: unsloth/Qwen2.5-1.5B-Instruct
+    quantized_id: unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit
+    default: true
+    min_vram_gb: 6
+    license: Apache 2.0
+    recommended_profile: profile_2080ti.yaml
+
+  - id: unsloth/Qwen2.5-3B-Instruct
+    quantized_id: unsloth/Qwen2.5-3B-Instruct-bnb-4bit
+    default: false
+    min_vram_gb: 8
+    license: Apache 2.0
+    recommended_profile: profile_a100.yaml
+
+  - id: unsloth/Llama-3.2-3B-Instruct
+    quantized_id: unsloth/Llama-3.2-3B-Instruct-bnb-4bit
+    default: false
+    min_vram_gb: 8
+    license: Llama 3.2 Community
+    recommended_profile: profile_a100.yaml
+
+  - id: Qwen/Qwen2.5-1.5B-Instruct
+    default: false
+    min_vram_gb: 6
+    license: Apache 2.0
+    recommended_profile: profile_2080ti.yaml

@@ -9,6 +9,6 @@
     "vLLM serves a merged model, responds to /v1/chat/completions with correct output"
   ],
   "subtask_count": 4,
-  "completed_count": 0,
+  "completed_count": 4,
   "created_at": "2026-05-17T10:00:00.000Z"
 }

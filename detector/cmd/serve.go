@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/hermes-apprentice/detector/internal/httpapi"
-	"github.com/hermes-apprentice/detector/internal/patternstore"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/httpapi"
+	"github.com/eschmechel/hermes-apprentice/detector/internal/patternstore"
 	"github.com/spf13/cobra"
 )
 

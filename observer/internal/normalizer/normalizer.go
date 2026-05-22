@@ -9,7 +9,7 @@ import (
 	"encoding/hex"
 	"strings"
 
-	"github.com/hermes-apprentice/observer/internal/poller"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/poller"
 )
 
 // Normalized is a poller.Message with NULL strings flattened to "" and a

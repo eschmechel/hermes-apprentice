@@ -4,10 +4,17 @@
 //	GET  /healthz                  liveness check
 //	GET  /stats                    latency percentiles (p50/p99)
 //	GET  /metrics                  Prometheus metrics
-//	POST /v1/chat/completions      OpenAI-compatible chat-completions endpoint
-//	                                that routes to a specialist when the last
-//	                                user message embeds close to a registered
-//	                                pattern, and otherwise proxies to upstream.
+// POST /v1/chat/completions      OpenAI-compatible chat-completions endpoint
+//                                that routes to a specialist when the last
+//                                user message embeds close to a registered
+//                                pattern, and otherwise proxies to upstream.
+//                                Supports canary %-ramp for progressive
+//                                specialist rollout.
+// GET  /canary/state             list all canary ramp states.
+// GET  /canary/state/{id}        get canary state for one pattern.
+// POST /canary/advance           record agreement score and advance ramp.
+// POST /canary/set-state         set canary state directly.
+// POST /canary/compare           compare two response bodies for agreement.
 //	POST /patterns                 register or replace a pattern (called by
 //	                                the detector after operator approval).
 //	GET  /patterns                 list registered patterns.
@@ -28,8 +35,12 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/hermes-apprentice/proxy/internal/patterns"
-	"github.com/hermes-apprentice/proxy/internal/runpod"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/alias"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/canary"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/patterns"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/ratelimit"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/runpod"
+	"github.com/eschmechel/hermes-apprentice/proxy/internal/tenant"
 )
 
 // Embedder is the minimal surface the proxy needs from the BGE-small
@@ -54,6 +65,11 @@ type Config struct {
 	PatternStore   *patterns.Store
 	MatchThreshold float32
 	ShadowRate     float64
+
+	// CanaryManager drives the canary %-ramp state machine for progressive
+	// specialist rollout. When nil, canary is disabled and all matched patterns
+	// route at 100%.
+	CanaryManager *canary.Manager
 
 	// ServeURL, when set, enables multi-LoRA routing: a matched request is
 	// routed by adapter name (the pattern id) to this single warm vLLM server
@@ -93,6 +109,18 @@ type Config struct {
 	// RunPodClient provides live RunPod pod cost data for /api/cost/runpod.
 	// When nil, the endpoint returns 503 (not configured).
 	RunPodClient *runpod.Client
+
+	// AliasStore resolves merged-pattern aliases. When nil, alias resolution
+	// is skipped and all matched patterns route by their own ID.
+	AliasStore *alias.Store
+
+	// TenantStore validates X-Apprentice-Tenant + X-Apprentice-Key headers.
+	// When nil, auth is disabled and all requests are treated as "global".
+	TenantStore *tenant.Store
+
+	// RateLimiter enforces per-tenant request rate limits.
+	// When nil, rate limiting is disabled.
+	RateLimiter *ratelimit.Limiter
 }
 
 type Server struct {
@@ -121,7 +149,15 @@ func New(cfg Config) *Server {
 	mux := http.NewServeMux()
 	s := &Server{cfg: cfg, logger: cfg.Logger}
 
+	// Routes that do NOT require tenant auth.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+
+	// Build auth-wrapped handler for authenticated routes.
+	var handler http.Handler = mux
+	if cfg.TenantStore != nil {
+		ah := newAuthHandler(cfg.TenantStore, cfg.Logger)
+		handler = ah.wrap(mux)
+	}
 
 	stats := newStatsHandler(cfg.LatencyTracker)
 	mux.HandleFunc("GET /stats", stats.handleStats)
@@ -132,6 +168,16 @@ func New(cfg Config) *Server {
 	pat := newPatternsHandler(cfg.PatternStore, cfg.Logger)
 	mux.HandleFunc("POST /patterns", pat.handleRegister)
 	mux.HandleFunc("GET /patterns", pat.handleList)
+
+	if cfg.AliasStore != nil {
+		ah := alias.NewHandler(cfg.AliasStore)
+		ah.RegisterRoutes(mux)
+	}
+
+	if cfg.CanaryManager != nil {
+		ch := canary.NewHandler(cfg.CanaryManager)
+		ch.RegisterRoutes(mux)
+	}
 
 	if cfg.StateDir != "" {
 		ch := newCostHandler(cfg.StateDir, cfg.CostDir, cfg.Logger, cfg.RunPodClient)
@@ -152,7 +198,7 @@ func New(cfg Config) *Server {
 
 	s.srv = &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           mux,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      120 * time.Second,

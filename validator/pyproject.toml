@@ -2,7 +2,7 @@
 name = "apprentice-validator"
 version = "0.1.0"
 description = "Apprentice validator: evaluation gate for trained specialist models."
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.15"
 
 # apprentice-trainer pinned via editable install so manifest_signer imports work.
 # vllm is the inference engine (offline batch mode, no server dependency).

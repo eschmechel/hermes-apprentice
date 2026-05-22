@@ -1,4 +1,4 @@
-module github.com/hermes-apprentice/detector
+module github.com/eschmechel/hermes-apprentice/detector
 
 go 1.26.3
 

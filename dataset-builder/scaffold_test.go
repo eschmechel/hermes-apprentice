@@ -12,7 +12,7 @@ func TestScaffold_Help(t *testing.T) {
 		t.Fatalf("--help: %v\n%s", err, out)
 	}
 	s := string(out)
-	for _, want := range []string{"dataset-builder", "build", "decompress", "version"} {
+	for _, want := range []string{"dataset-builder", "build", "merge", "decompress", "version"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("--help missing %q", want)
 		}
@@ -37,6 +37,30 @@ func TestScaffold_BuildNeedsPatternID(t *testing.T) {
 	s := string(out)
 	if !strings.Contains(s, "--pattern-id is required") {
 		t.Errorf("error missing pattern-id hint: %s", s)
+	}
+}
+
+func TestScaffold_MergeNeedsBothPatterns(t *testing.T) {
+	out, err := exec.Command("go", "run", ".", "merge", "--pattern-a", "p1").CombinedOutput()
+	if err == nil {
+		t.Fatal("expected error when --pattern-b is missing")
+	}
+	s := string(out)
+	if !strings.Contains(s, "--pattern-a and --pattern-b are required") {
+		t.Errorf("error missing pattern hint: %s", s)
+	}
+}
+
+func TestScaffold_MergeHelp(t *testing.T) {
+	out, err := exec.Command("go", "run", ".", "merge", "--help").CombinedOutput()
+	if err != nil {
+		t.Fatalf("merge --help: %v\n%s", err, out)
+	}
+	s := string(out)
+	for _, want := range []string{"--pattern-a", "--pattern-b", "--merged-id"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("merge --help missing %q", want)
+		}
 	}
 }
 

@@ -1,0 +1,236 @@
+{
+  "title": "Apprentice Overview",
+  "uid": "apprentice-overview",
+  "tags": ["apprentice", "hermes"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "panels": [
+    {
+      "title": "Request Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "spanNulls": false, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(apprentice_proxy_requests_total[1m])) by (route)",
+          "legendFormat": "{{ route }}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "title": "Latency (p50 / p95 / p99)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "spanNulls": false, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(apprentice_proxy_latency_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p50 {{ route }}",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(apprentice_proxy_latency_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p95 {{ route }}",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(apprentice_proxy_latency_seconds_bucket[5m])) by (le, route))",
+          "legendFormat": "p99 {{ route }}",
+          "refId": "C"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "title": "Error Rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "spanNulls": false, "showPoints": "never" },
+          "max": 100,
+          "min": 0
+        }
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(apprentice_proxy_requests_total{status=~\"5xx\"}[5m])) / sum(rate(apprentice_proxy_requests_total[5m])) * 100",
+          "legendFormat": "5xx %",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(apprentice_proxy_requests_total{status=~\"4xx\"}[5m])) / sum(rate(apprentice_proxy_requests_total[5m])) * 100",
+          "legendFormat": "4xx %",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "title": "Cost Saved (USD)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "usd",
+          "custom": { "spanNulls": false, "showPoints": "never" }
+        }
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "table", "placement": "right" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(apprentice_proxy_cost_usd_total{route=\"specialist\"}[1h])) by (model)",
+          "legendFormat": "{{ model }}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    },
+    {
+      "title": "Requests by Pattern (Top 10)",
+      "type": "barchart",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "spanNulls": false }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": { "displayMode": "hidden" }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(apprentice_proxy_requests_total{route=\"specialist\"}[5m])) by (pattern_id))",
+          "legendFormat": "{{ pattern_id }}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "title": "Latency Comparison (Specialist vs Upstream)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["mean"] },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(apprentice_proxy_latency_seconds_bucket{route=\"specialist\"}[5m])) by (le))",
+          "legendFormat": "Specialist p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(apprentice_proxy_latency_seconds_bucket{route=\"upstream\"}[5m])) by (le))",
+          "legendFormat": "Upstream p95",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+    },
+    {
+      "title": "Requests by Status Class",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {}
+      },
+      "options": {
+        "pieType": "donut",
+        "legend": { "displayMode": "table", "placement": "right" },
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(apprentice_proxy_requests_total[1h])) by (status)",
+          "legendFormat": "{{ status }}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 }
+    },
+    {
+      "title": "Current Request Counters",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "P1809F7CD0C75ACF3" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(apprentice_proxy_requests_total{route=\"specialist\"}[24h]))",
+          "legendFormat": "Specialist (24h)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(apprentice_proxy_requests_total{route=\"upstream\"}[24h]))",
+          "legendFormat": "Upstream (24h)",
+          "refId": "B"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 }
+    }
+  ]
+}

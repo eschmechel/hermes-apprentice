@@ -42,7 +42,14 @@ from typing import Any
 
 from . import baseline_io, failure_reporter, metrics, promotion_gate, registry, skill_registrar
 from .logging import setup_logging
-from .test_runner import check_only as specialist_check_only
+from .test_runner import check_only as specialist_check_only, load_test_dataset
+
+# re-export for external use
+from .registry import find_latest_version  # noqa: F401
+
+
+def _apprentice_root() -> Path:
+    return Path(os.environ.get("APPRENTICE_ROOT", Path.home() / ".apprentice")).expanduser()
 
 LOG = logging.getLogger("apprentice_validator")
 
@@ -63,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
                         "Required unless --check-only.")
     p.add_argument("--teacher-score", type=float, default=None,
                    help="Optional teacher F1 score for informational reporting.")
+    p.add_argument("--merge-regression", nargs=2, metavar=("PARENT_A", "PARENT_B"),
+                   help="Parent pattern IDs for merge regression check. "
+                        "When set, validates the merged model against both "
+                        "parents' test datasets; both must pass the "
+                        "promotion gate independently.")
     p.add_argument("--max-tokens", type=int, default=256,
                    help="Max tokens for specialist inference (default: 256).")
     p.add_argument("--gpu-memory-utilization", type=float, default=0.90,
@@ -91,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
                         f"{skill_registrar.DEFAULT_GUEST_SKILLS_DIR}).")
     p.add_argument("--check-only", action="store_true",
                    help="Validate args + dataset without running inference.")
+    p.add_argument("--datasets-root", default=None,
+                   help="Override datasets root for regression check (default: ~/.apprentice/datasets).")
     p.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -231,8 +245,119 @@ def run_validate(args: argparse.Namespace) -> int:
         except OSError as e:
             LOG.error("failure report write failed", extra={"error": str(e)})
 
+    # ---- merge regression check --------------------------------------------
+    if args.merge_regression:
+        reg_root = Path(args.datasets_root) if args.datasets_root else _apprentice_root() / "datasets"
+        regression_results = _run_regression_check(
+            model_dir=model_dir,
+            parent_patterns=args.merge_regression,
+            datasets_root=reg_root,
+            max_tokens=args.max_tokens,
+            gpu_memory_utilization=args.gpu_memory_utilization,
+        )
+        result["regression_check"] = regression_results
+        regression_passed = all(r["passed"] for r in regression_results.values())
+        if not regression_passed:
+            LOG.warning("merge regression check failed on at least one parent")
+            _print_result(result)
+            return regression_results.get("exit_code", 1)
+
     _print_result(result)
     return 0 if verdict["passed"] else 1
+
+
+def _resolve_latest_dataset(datasets_root: Path, pattern_id: str) -> Path | None:
+    """Return the path to the latest versioned dataset for *pattern_id*."""
+    pattern_dir = datasets_root / pattern_id
+    if not pattern_dir.exists():
+        return None
+    max_v, max_dir = 0, None
+    for entry in pattern_dir.iterdir():
+        if entry.is_dir() and entry.name.startswith("v"):
+            try:
+                v = int(entry.name[1:])
+                if v > max_v:
+                    max_v, max_dir = v, entry
+            except ValueError:
+                continue
+    return max_dir
+
+
+def _run_regression_check(
+    model_dir: Path,
+    parent_patterns: list[str],
+    datasets_root: Path,
+    max_tokens: int,
+    gpu_memory_utilization: float,
+) -> dict[str, Any]:
+    """Run inference on each parent's test set; both must pass the gate."""
+    from . import baseline_io, metrics, promotion_gate, test_runner
+
+    results: dict[str, Any] = {}
+    all_passed = True
+
+    for parent_id in parent_patterns:
+        dataset_dir = _resolve_latest_dataset(datasets_root, parent_id)
+        if not dataset_dir:
+            results[parent_id] = {"error": f"no dataset found for {parent_id}", "passed": False}
+            all_passed = False
+            continue
+
+        test_dataset = dataset_dir / "test.jsonl.gz"
+        if not test_dataset.exists():
+            results[parent_id] = {"error": f"test.jsonl.gz not found at {test_dataset}", "passed": False}
+            all_passed = False
+            continue
+
+        # Resolve baseline pairs — same version as the dataset.
+        version = dataset_dir.name
+        baseline_path = _apprentice_root() / "baselines" / f"{parent_id}-{version}.jsonl"
+        if not baseline_path.exists():
+            results[parent_id] = {"error": f"baseline pairs not found at {baseline_path}", "passed": False}
+            all_passed = False
+            continue
+
+        try:
+            test_records = load_test_dataset(test_dataset)
+            baseline_header, baseline_pairs = baseline_io.read_pairs(
+                path=baseline_path,
+                expected_test_dataset=test_dataset,
+                expected_count=len(test_records),
+            )
+        except (FileNotFoundError, ValueError) as e:
+            results[parent_id] = {"error": str(e), "passed": False}
+            all_passed = False
+            continue
+
+        try:
+            specialist_pairs = test_runner.run_specialist(
+                model_dir=model_dir,
+                test_dataset=test_dataset,
+                max_tokens=max_tokens,
+                gpu_memory_utilization=gpu_memory_utilization,
+            )
+        except RuntimeError as e:
+            results[parent_id] = {"error": f"inference failed: {e}", "passed": False}
+            all_passed = False
+            continue
+
+        specialist_scores = metrics.compute_metrics(specialist_pairs)
+        baseline_scores = metrics.compute_metrics(baseline_pairs)
+        comparison = metrics.compare_metrics(specialist_scores, baseline_scores)
+        verdict = promotion_gate.evaluate(comparison)
+
+        results[parent_id] = {
+            "passed": verdict["passed"],
+            "verdict": verdict,
+            "specialist_scores": specialist_scores,
+            "baseline_scores": baseline_scores,
+        }
+        if not verdict["passed"]:
+            all_passed = False
+
+    results["all_passed"] = all_passed
+    results["exit_code"] = 0 if all_passed else 1
+    return results
 
 
 def _print_result(result: dict[str, Any]) -> None:

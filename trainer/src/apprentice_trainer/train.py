@@ -32,6 +32,8 @@ from typing import Any
 
 import yaml
 
+from . import models
+
 LOG = logging.getLogger("apprentice_trainer")
 
 # logging.LogRecord built-in attrs we never want in the JSON payload (Python
@@ -293,13 +295,24 @@ def run_training(args: argparse.Namespace) -> int:
         exit_code = 1
         LOG.exception("training raised")
 
+    # Read merge lineage from dataset manifest if this is a merged dataset.
+    extra: dict[str, Any] = {"adapter_dir": str(adapter_dir) if exit_code == 0 else None}
+    ds_manifest = dataset_dir / "manifest.json"
+    if ds_manifest.exists():
+        try:
+            ds_data = json.loads(ds_manifest.read_text(encoding="utf-8"))
+            if "merged_from" in ds_data:
+                extra["merged_from"] = ds_data["merged_from"]
+        except (OSError, json.JSONDecodeError):
+            pass
+
     manifest = manifest_writer.build_manifest(
         dataset_dir=dataset_dir,
         base_model=args.base_model,
         hyperparameters=manifest_writer.collect_hyperparameters(args),
         runtime_seconds=train_time,
         exit_code=exit_code,
-        extra={"adapter_dir": str(adapter_dir) if exit_code == 0 else None},
+        extra=extra,
     )
     manifest_writer.write_manifest(output_dir, manifest)
     return exit_code
@@ -325,8 +338,12 @@ def build_parser() -> argparse.ArgumentParser:
                         "Defaults to $APPRENTICE_TRAINER_PROFILE so users can drop a "
                         "personal profile at e.g. ~/.config/apprentice-trainer/local.yaml "
                         "and have it auto-applied.")
-    p.add_argument("--base-model", default="unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit",
-                   help="HF model id; defaults to the Unsloth-prequantized Qwen2.5-1.5B.")
+    p.add_argument("--base-model", default=None,
+                   help="HF model id (default: the entry marked default: true in "
+                        "supported_models.yaml, respecting --load-in-4bit). "
+                        "Use --list-models to see available models.")
+    p.add_argument("--list-models", action="store_true",
+                   help="Print available base models and exit.")
     p.add_argument("--load-in-4bit", action=argparse.BooleanOptionalAction, default=True,
                    help="Whether to bnb-4bit-quantize the base model (default True). "
                         "Set --no-load-in-4bit on big-VRAM machines (A100, H100) where "
@@ -414,6 +431,17 @@ def main(argv: list[str] | None = None) -> int:
     if ignored:
         LOG.warning("profile had unknown keys (ignored)",
                     extra={"profile": prelim.profile, "unknown": ignored})
+
+    if args.list_models:
+        for m in models.list_models():
+            default_mark = " (default)" if m.get("default") else ""
+            quant = f" 4-bit: {m['quantized_id']}" if m.get("quantized_id") else ""
+            print(f"  {m['id']}{default_mark}{quant}")
+        return 0
+
+    # Resolve base model: None → default, alias → full ID.
+    resolved_base = models.resolve_model(args.base_model, load_in_4bit=args.load_in_4bit)
+    args.base_model = resolved_base
 
     if args.check_only:
         return check_only(args)

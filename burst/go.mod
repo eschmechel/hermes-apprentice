@@ -1,4 +1,4 @@
-module github.com/hermes-apprentice/burst
+module github.com/eschmechel/hermes-apprentice/burst
 
 go 1.26.3
 

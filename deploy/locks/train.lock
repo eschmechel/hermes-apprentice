@@ -1,8 +1,7 @@
-# Apprentice TRAIN venv lock — exact third-party pins for the Unsloth training stack.
-# Source: ~/.apprentice/venv-train (validated good). Install: uv pip install -r deploy/locks/train.lock
-# Then install the repo packages editable: uv pip install -e ./trainer
-# Invariants: torch<2.11 (Unsloth ceiling); trl==0.23 + transformers 4.56 dodge the trl-0.24 EOS bug;
-#            import unsloth before trl/transformers/peft (enforced in trainer/train.py).
+# Apprentice TRAIN venv lock (v0.2) — exact third-party pins for the Unsloth training stack.
+# Install: uv pip install -r deploy/locks/train.lock
+# Then install repo packages editable: uv pip install -e ./trainer -e ./telegram -e ./orchestrator
+# Invariants: torch<2.11 (Unsloth ceiling); trl==0.23 + transformers 4.56 dodge the trl-0.24 EOS bug.
 #
 [1maccelerate[0m==1.13.0
 [1maiohappyeyeballs[0m==2.6.2

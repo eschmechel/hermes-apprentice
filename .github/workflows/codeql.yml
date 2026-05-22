@@ -1,0 +1,30 @@
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '30 1 * * 0'
+
+jobs:
+  analyze-go:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module: [proxy, dataset-builder, registry-service, burst]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: go
+          source-root: ${{ matrix.module }}
+      - uses: github/codeql-action/analyze@v3
+
+  analyze-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: python
+      - uses: github/codeql-action/analyze@v3

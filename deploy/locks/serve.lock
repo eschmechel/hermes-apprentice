@@ -1,5 +1,5 @@
-# Apprentice SERVE venv lock — exact third-party pins for the vLLM serving/validation stack.
-# Source: ~/.apprentice/venv-serve (validated good). Install: uv pip install -r deploy/locks/serve.lock
+# Apprentice SERVE venv lock (v0.2) — exact third-party pins for the vLLM serving/validation stack.
+# Install: uv pip install -r deploy/locks/serve.lock
 # Then install repo packages editable: uv pip install -e ./serving -e ./validator -e ./orchestrator -e ./telegram -e ./trainer
 # Invariant: torch 2.11 matches vllm 0.21's compiled ABI (do NOT co-install Unsloth here).
 #

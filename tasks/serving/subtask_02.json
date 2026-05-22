@@ -2,7 +2,7 @@
   "id": "serving-02",
   "seq": "02",
   "title": "Confirm API shape matches OpenAI spec (Hermes compatibility)",
-  "status": "pending",
+  "status": "completed",
   "depends_on": ["01"],
   "parallel": false,
   "suggested_agent": "CoderAgent",

@@ -14,14 +14,16 @@ import (
 const graphqlURL = "https://api.runpod.io/graphql"
 
 type Client struct {
-	apiKey string
-	client *http.Client
+	apiKey  string
+	baseURL string
+	client  *http.Client
 }
 
 func New(apiKey string) *Client {
 	return &Client{
-		apiKey: apiKey,
-		client: &http.Client{Timeout: 15 * time.Second},
+		apiKey:  apiKey,
+		baseURL: graphqlURL,
+		client:  &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -75,7 +77,7 @@ func (c *Client) ListPods(ctx context.Context) (*Summary, error) {
 	query := `{ "query": "{ myself { pods { id name costPerHr desiredStatus runtime { uptimeInSeconds gpus { gpuUtilPercent memoryUtilPercent } } } } }" }`
 	body := strings.NewReader(query)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, graphqlURL, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +140,103 @@ func (c *Client) ListPods(ctx context.Context) (*Summary, error) {
 	return sum, nil
 }
 
+type PodProvisionInput struct {
+	GPUTypeID         string `json:"gpuTypeId"`
+	GPUCount          int    `json:"gpuCount"`
+	ContainerDiskInGb int    `json:"containerDiskInGb"`
+	MinVcpuCount      int    `json:"minVcpuCount"`
+	MinMemoryInGb     int    `json:"minMemoryInGb"`
+	Name              string `json:"name"`
+}
+
+type PodDeployResult struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	MachineID     string  `json:"machineId"`
+	GPUCount      int     `json:"gpuCount"`
+	CostPerHr     float64 `json:"costPerHr"`
+	DesiredStatus string  `json:"desiredStatus"`
+	ImageName     string  `json:"imageName"`
+}
+
+func (c *Client) ProvisionPod(ctx context.Context, input PodProvisionInput) (*PodDeployResult, error) {
+	query := fmt.Sprintf(`{
+		"query": "mutation { podFindAndDeployOnDemand(input: { gpuTypeId: \"%s\", gpuCount: %d, containerDiskInGb: %d, minVcpuCount: %d, minMemoryInGb: %d, name: \"%s\" }) { id name machineId gpuCount costPerHr desiredStatus imageName } }"
+	}`, input.GPUTypeID, input.GPUCount, input.ContainerDiskInGb, input.MinVcpuCount, input.MinMemoryInGb, input.Name)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, strings.NewReader(query))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("runpod provision: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("runpod provision read: %w", err)
+	}
+
+	var parsed struct {
+		Data struct {
+			PodFindAndDeployOnDemand PodDeployResult `json:"podFindAndDeployOnDemand"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, fmt.Errorf("runpod provision parse: %w", err)
+	}
+	if len(parsed.Errors) > 0 {
+		errs := make([]string, len(parsed.Errors))
+		for i, e := range parsed.Errors {
+			errs[i] = e.Message
+		}
+		return nil, fmt.Errorf("runpod provision errors: %s", strings.Join(errs, "; "))
+	}
+	result := parsed.Data.PodFindAndDeployOnDemand
+	if result.ID == "" {
+		return nil, fmt.Errorf("runpod provision returned empty pod id")
+	}
+	return &result, nil
+}
+
+func (c *Client) TerminatePod(ctx context.Context, podID string) error {
+	query := fmt.Sprintf(`{
+		"query": "mutation { podTerminate(input: { podId: \"%s\" }) }"
+	}`, podID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, strings.NewReader(query))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("runpod terminate: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("runpod terminate status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
 func (c *Client) Ping(ctx context.Context) error {
 	query := `{ "query": "{ myself { pods { id } } }" }`
 	body := bytes.NewReader([]byte(query))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, graphqlURL, body)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL, body)
 	if err != nil {
 		return err
 	}
