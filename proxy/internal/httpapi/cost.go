@@ -97,7 +97,7 @@ func (ch *costHandler) handleUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ch *costHandler) handleLatency(w http.ResponseWriter, r *http.Request) {
-	proxy := readProxyLog(ch.proxyLogPath())
+	proxy := readAllProxyLog(ch.proxyLogPath())
 	stats := computeLatencyStats(proxy)
 
 	writeJSON(w, http.StatusOK, stats)
@@ -136,12 +136,29 @@ func readProxyLog(path string) []proxyLogEntry {
 	for dec.More() {
 		var e proxyLogEntry
 		if err := dec.Decode(&e); err != nil {
-			// slog JSON handler wraps attrs under "msg" etc; try raw
 			continue
 		}
 		if e.RouteDecision == "specialist" {
 			entries = append(entries, e)
 		}
+	}
+	return entries
+}
+
+func readAllProxyLog(path string) []proxyLogEntry {
+	var entries []proxyLogEntry
+	fh, err := os.Open(path)
+	if err != nil {
+		return entries
+	}
+	defer fh.Close()
+	dec := json.NewDecoder(fh)
+	for dec.More() {
+		var e proxyLogEntry
+		if err := dec.Decode(&e); err != nil {
+			continue
+		}
+		entries = append(entries, e)
 	}
 	return entries
 }
