@@ -55,7 +55,7 @@ jobs:
         module: [proxy, dataset-builder, registry-service, burst]
     steps:
       - uses: actions/checkout@v4
-      - uses: golangci/golangci-lint-action@v6
+      - uses: golangci/golangci-lint-action@v9
         with:
           working-directory: ${{ matrix.module }}
           version: latest
