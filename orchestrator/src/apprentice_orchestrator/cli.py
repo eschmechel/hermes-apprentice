@@ -10,6 +10,7 @@ import sys
 from . import jobs, notify as notify_mod, watcher
 from .config import Config
 from .pipeline import run_pipeline
+from . import cost as cost_mod
 
 
 def _setup_logging(verbose: bool) -> None:
@@ -42,6 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("status", help="Show a job's state (or list recent jobs).")
     s.add_argument("--job-id", default=None)
+
+    c = sub.add_parser("cost", help="Print ROI analysis for one or all patterns.")
+    c.add_argument("--pattern-id", default=None)
     return p
 
 
@@ -79,8 +83,17 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"jobs": ids}, indent=2))
         return 0
 
+    if args.cmd == "cost":
+        if args.pattern_id:
+            result = cost_mod.roi(cfg, args.pattern_id)
+        else:
+            result = cost_mod.all_patterns_roi(cfg)
+        print(json.dumps(result, indent=2))
+        return 0
+
     return 2
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
