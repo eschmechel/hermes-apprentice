@@ -16,6 +16,7 @@ import json
 import glob as glob_mod
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Iterator
 
 
 # ── helpers ────────────────────────────────────────────────────────────────
@@ -55,6 +56,7 @@ def record(cfg, pattern_id: str, job_id: str, train_seconds: float,
     ledger_path = cfg.cost_dir / "ledger.jsonl"
     with open(ledger_path, "a") as fh:
         fh.write(json.dumps(entry, sort_keys=True) + "\n")
+        fh.flush()
     return entry
 
 
@@ -95,13 +97,12 @@ def _log_paths(cfg) -> list[Path]:
     return [Path(p) for p in glob_mod.glob(glob_str) if Path(p).is_file()]
 
 
-def cost_saved(cfg, pattern_id: str) -> tuple[float, str | None]:
-    """Parse proxy log lines for *pattern_id*, return (total_saved_usd, earliest_ts).
+def _iter_specialist_entries(cfg,
+                             pattern_id: str | None = None) -> Iterator[dict]:
+    """Yield dicts from the proxy log with route_decision == 'specialist'.
 
-    Returns ``(0.0, None)`` if no log files or no matching lines.
+    When *pattern_id* is given, only entries for that pattern are yielded.
     """
-    total = 0.0
-    earliest: str | None = None
     for log_path in _log_paths(cfg):
         try:
             with open(log_path) as fh:
@@ -115,55 +116,53 @@ def cost_saved(cfg, pattern_id: str) -> tuple[float, str | None]:
                         continue
                     if obj.get("route_decision") != "specialist":
                         continue
-                    if obj.get("pattern_id") != pattern_id:
+                    if pattern_id is not None and obj.get("pattern_id") != pattern_id:
                         continue
-                    saved = obj.get("cost_saved_usd")
-                    if isinstance(saved, (int, float)):
-                        total += float(saved)
-                    ts = obj.get("time", "")
-                    if ts and (earliest is None or ts < earliest):
-                        earliest = ts
+                    yield obj
         except (OSError, IOError):
             continue
+
+
+def cost_saved(cfg, pattern_id: str) -> tuple[float, str | None]:
+    """Parse proxy log lines for *pattern_id*, return (total_saved_usd, earliest_ts).
+
+    Returns ``(0.0, None)`` if no log files or no matching lines.
+    """
+    total = 0.0
+    earliest: str | None = None
+    for obj in _iter_specialist_entries(cfg, pattern_id):
+        saved = obj.get("cost_saved_usd")
+        if isinstance(saved, (int, float)):
+            total += float(saved)
+        ts = obj.get("time", "")
+        if ts and (earliest is None or ts < earliest):
+            earliest = ts
     return round(total, 6), earliest
 
 
 def roi(cfg, pattern_id: str) -> dict:
-    """Full ROI snapshot for one pattern."""
+    """Full ROI snapshot for one pattern — single pass over the proxy log."""
     tc = training_cost(cfg, pattern_id)
-    saved, earliest_saved = cost_saved(cfg, pattern_id)
+    saved = 0.0
+    earliest_saved: str | None = None
+    cumulative = 0.0
+    broke_even_at: str | None = None
+
+    for obj in _iter_specialist_entries(cfg, pattern_id):
+        saved_val = obj.get("cost_saved_usd")
+        val = float(saved_val) if isinstance(saved_val, (int, float)) else 0.0
+        saved += val
+        if tc > 0 and broke_even_at is None:
+            cumulative += val
+            if cumulative >= tc:
+                broke_even_at = obj.get("time", "")
+        ts = obj.get("time", "")
+        if ts and (earliest_saved is None or ts < earliest_saved):
+            earliest_saved = ts
+
+    saved = round(saved, 6)
     roi_val = round(saved - tc, 6)
     broke_even = roi_val >= 0 if tc > 0 else True
-
-    # Determine break-even time from the proxy log
-    broke_even_at: str | None = None
-    if tc > 0:
-        cumulative = 0.0
-        for log_path in _log_paths(cfg):
-            try:
-                with open(log_path) as fh:
-                    for line in fh:
-                        line = line.strip()
-                        if not line:
-                            continue
-                        try:
-                            obj = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if obj.get("route_decision") != "specialist":
-                            continue
-                        if obj.get("pattern_id") != pattern_id:
-                            continue
-                        saved_val = obj.get("cost_saved_usd")
-                        if isinstance(saved_val, (int, float)):
-                            cumulative += float(saved_val)
-                        if cumulative >= tc and broke_even_at is None:
-                            broke_even_at = obj.get("time", "")
-                            break
-                if broke_even_at is not None:
-                    break
-            except (OSError, IOError):
-                continue
 
     # Count ledger runs for this pattern
     ledger_path = cfg.cost_dir / "ledger.jsonl"
@@ -178,6 +177,7 @@ def roi(cfg, pattern_id: str) -> dict:
         "broke_even": broke_even,
         "runs": runs,
         "broke_even_at": broke_even_at,
+        "earliest_saved": earliest_saved,
     }
 
 
@@ -207,35 +207,18 @@ def usage_over_time(cfg, pattern_id: str | None = None,
     bucket_fmt = _BUCKET_FMTS.get(bucket, _BUCKET_FMTS["day"])
     buckets: dict[str, dict] = {}
 
-    for log_path in _log_paths(cfg):
-        try:
-            with open(log_path) as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        obj = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue
-                    if obj.get("route_decision") != "specialist":
-                        continue
-                    pid = obj.get("pattern_id", "")
-                    if pattern_id is not None and pid != pattern_id:
-                        continue
-                    ts = obj.get("time", "")
-                    dt = _parse_iso(ts)
-                    if dt is None:
-                        continue
-                    key = dt.strftime(bucket_fmt)
-                    saved = obj.get("cost_saved_usd")
-                    saved_val = float(saved) if isinstance(saved, (int, float)) else 0.0
-                    if key not in buckets:
-                        buckets[key] = {"time": key, "requests": 0, "cost_saved": 0.0}
-                    buckets[key]["requests"] += 1
-                    buckets[key]["cost_saved"] += saved_val
-        except (OSError, IOError):
+    for obj in _iter_specialist_entries(cfg, pattern_id):
+        ts = obj.get("time", "")
+        dt = _parse_iso(ts)
+        if dt is None:
             continue
+        key = dt.strftime(bucket_fmt)
+        saved = obj.get("cost_saved_usd")
+        saved_val = float(saved) if isinstance(saved, (int, float)) else 0.0
+        if key not in buckets:
+            buckets[key] = {"time": key, "requests": 0, "cost_saved": 0.0}
+        buckets[key]["requests"] += 1
+        buckets[key]["cost_saved"] += saved_val
 
     for b in buckets.values():
         b["cost_saved"] = round(b["cost_saved"], 6)
@@ -272,23 +255,24 @@ def proxy_latency_stats(cfg) -> dict:
         except (OSError, IOError):
             continue
 
-    def _pct(vals: list[float], p: float) -> float:
-        if not vals:
-            return 0.0
-        sorted_vals = sorted(vals)
-        idx = int(len(sorted_vals) * p / 100.0)
-        idx = min(idx, len(sorted_vals) - 1)
-        return sorted_vals[idx]
-
     def _stats(vals: list[float]) -> dict:
         if not vals:
             return {"count": 0, "avg": 0.0, "p50": 0.0, "p95": 0.0, "p99": 0.0}
+        sorted_vals = sorted(vals)
+        n = len(sorted_vals)
+        avg = sum(sorted_vals) / n
+
+        def _pct(p: float) -> float:
+            idx = int(n * p / 100.0)
+            idx = min(idx, n - 1)
+            return sorted_vals[idx]
+
         return {
-            "count": len(vals),
-            "avg": round(sum(vals) / len(vals), 2),
-            "p50": round(_pct(vals, 50), 2),
-            "p95": round(_pct(vals, 95), 2),
-            "p99": round(_pct(vals, 99), 2),
+            "count": n,
+            "avg": round(avg, 2),
+            "p50": round(_pct(50), 2),
+            "p95": round(_pct(95), 2),
+            "p99": round(_pct(99), 2),
         }
 
     return {

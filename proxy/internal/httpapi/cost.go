@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/hermes-apprentice/proxy/internal/runpod"
@@ -16,16 +15,17 @@ import (
 
 type costHandler struct {
 	stateDir     string
+	costDir      string
 	logger       *slog.Logger
 	runpodClient *runpod.Client
 }
 
-func newCostHandler(stateDir string, logger *slog.Logger, runpodClient *runpod.Client) *costHandler {
-	return &costHandler{stateDir: stateDir, logger: logger, runpodClient: runpodClient}
+func newCostHandler(stateDir, costDir string, logger *slog.Logger, runpodClient *runpod.Client) *costHandler {
+	return &costHandler{stateDir: stateDir, costDir: costDir, logger: logger, runpodClient: runpodClient}
 }
 
 func (ch *costHandler) ledgerPath() string {
-	return filepath.Join(filepath.Dir(ch.stateDir), "cost", "ledger.jsonl")
+	return filepath.Join(ch.costDir, "ledger.jsonl")
 }
 
 func (ch *costHandler) proxyLogPath() string {
@@ -48,12 +48,14 @@ type proxyLogEntry struct {
 }
 
 type roiResult struct {
-	PatternID  string  `json:"pattern_id"`
-	TrainCost  float64 `json:"train_cost"`
-	Saved      float64 `json:"saved"`
-	ROI        float64 `json:"roi"`
-	BrokeEven  bool    `json:"broke_even"`
-	Runs       int     `json:"runs"`
+	PatternID     string  `json:"pattern_id"`
+	TrainCost     float64 `json:"train_cost"`
+	Saved         float64 `json:"saved"`
+	ROI           float64 `json:"roi"`
+	BrokeEven     bool    `json:"broke_even"`
+	Runs          int     `json:"runs"`
+	BrokeEvenAt   string  `json:"broke_even_at,omitempty"`
+	EarliestSaved string  `json:"earliest_saved,omitempty"`
 }
 
 type usageBucket struct {
@@ -79,8 +81,16 @@ func (ch *costHandler) handleROI(w http.ResponseWriter, r *http.Request) {
 	proxy := readProxyLog(ch.proxyLogPath())
 
 	results := computeROI(ledger, proxy, patternID)
-	if patternID != "" && len(results) == 0 {
-		results = []roiResult{{PatternID: patternID}}
+
+	if patternID != "" {
+		if len(results) == 0 {
+			writeJSON(w, http.StatusNotFound, map[string]string{
+				"error": "no cost data for pattern '" + patternID + "'",
+			})
+			return
+		}
+		writeJSON(w, http.StatusOK, results[0])
+		return
 	}
 
 	writeJSON(w, http.StatusOK, results)
@@ -118,7 +128,7 @@ func (ch *costHandler) handleRunPod(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		ch.logger.Warn("runpod list failed", "err", err)
 		writeJSON(w, http.StatusBadGateway, map[string]string{
-			"error": "RunPod API error: " + err.Error(),
+			"error": "RunPod API error",
 		})
 		return
 	}
@@ -190,10 +200,12 @@ func readAllProxyLog(path string) []proxyLogEntry {
 
 func computeROI(ledger []ledgerEntry, proxy []proxyLogEntry, filterID string) []roiResult {
 	type accum struct {
-		trainCost  float64
-		saved      float64
-		runs       int
-		earliestTS string
+		trainCost    float64
+		saved        float64
+		runs         int
+		earliestTS   string
+		cumulative   float64
+		brokeEvenAt  string
 	}
 
 	byPattern := map[string]*accum{}
@@ -221,8 +233,12 @@ func computeROI(ledger []ledgerEntry, proxy []proxyLogEntry, filterID string) []
 			byPattern[e.PatternID] = a
 		}
 		a.saved += e.CostSavedUSD
+		a.cumulative += e.CostSavedUSD
 		if a.earliestTS == "" || e.Time < a.earliestTS {
 			a.earliestTS = e.Time
+		}
+		if a.brokeEvenAt == "" && a.trainCost > 0 && a.cumulative >= a.trainCost {
+			a.brokeEvenAt = e.Time
 		}
 	}
 
@@ -230,22 +246,20 @@ func computeROI(ledger []ledgerEntry, proxy []proxyLogEntry, filterID string) []
 	for pid, a := range byPattern {
 		brokeEven := a.trainCost <= 0 || a.saved >= a.trainCost
 		results = append(results, roiResult{
-			PatternID: pid,
-			TrainCost: math.Round(a.trainCost*1e6) / 1e6,
-			Saved:     math.Round(a.saved*1e6) / 1e6,
-			ROI:       math.Round((a.saved-a.trainCost)*1e6) / 1e6,
-			BrokeEven: brokeEven,
-			Runs:      a.runs,
+			PatternID:     pid,
+			TrainCost:     math.Round(a.trainCost*1e6) / 1e6,
+			Saved:         math.Round(a.saved*1e6) / 1e6,
+			ROI:           math.Round((a.saved-a.trainCost)*1e6) / 1e6,
+			BrokeEven:     brokeEven,
+			Runs:          a.runs,
+			BrokeEvenAt:   a.brokeEvenAt,
+			EarliestSaved: a.earliestTS,
 		})
 	}
 
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].PatternID < results[j].PatternID
 	})
-
-	if len(results) == 0 && filterID != "" {
-		results = []roiResult{{PatternID: filterID}}
-	}
 
 	return results
 }
@@ -261,7 +275,6 @@ func bucketUsage(proxy []proxyLogEntry, patternID, bucket string) []usageBucket 
 		}
 		ts, err := time.Parse(time.RFC3339, e.Time)
 		if err != nil {
-			// Try simpler formats
 			if ts, err = time.Parse("2006-01-02T15:04:05Z", e.Time); err != nil {
 				continue
 			}
@@ -271,8 +284,9 @@ func bucketUsage(proxy []proxyLogEntry, patternID, bucket string) []usageBucket 
 		case "hour":
 			key = ts.Format("2006-01-02T15")
 		case "week":
-			_, week := ts.ISOWeek()
+			year, week := ts.ISOWeek()
 			key = ts.Format("2006") + "-W" + padInt(week)
+			_ = year
 		default: // day
 			key = ts.Format("2006-01-02")
 		}
@@ -299,8 +313,10 @@ func bucketUsage(proxy []proxyLogEntry, patternID, bucket string) []usageBucket 
 }
 
 func padInt(n int) string {
-	s := strings.Repeat("0", 2) + itoa(n)
-	return s[len(s)-2:]
+	if n < 10 {
+		return "0" + itoa(n)
+	}
+	return itoa(n)
 }
 
 func itoa(n int) string {
@@ -315,7 +331,7 @@ func itoa(n int) string {
 	i := len(buf)
 	for n > 0 {
 		i--
-		buf[i] = byte('0' + n%10)
+		buf[i] = byte('0'+n%10)
 		n /= 10
 	}
 	if neg {

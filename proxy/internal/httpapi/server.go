@@ -25,6 +25,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/hermes-apprentice/proxy/internal/patterns"
@@ -81,6 +82,10 @@ type Config struct {
 	// ledger.jsonl and proxy.log). When empty, cost endpoints are disabled.
 	StateDir string
 
+	// CostDir is the directory containing ledger.jsonl.
+	// Defaults to filepath.Dir(StateDir)/cost when empty.
+	CostDir string
+
 	// RunPodClient provides live RunPod pod cost data for /api/cost/runpod.
 	// When nil, the endpoint returns 503 (not configured).
 	RunPodClient *runpod.Client
@@ -102,6 +107,9 @@ func New(cfg Config) *Server {
 	if cfg.MatchThreshold == 0 {
 		cfg.MatchThreshold = 0.78
 	}
+	if cfg.CostDir == "" && cfg.StateDir != "" {
+		cfg.CostDir = filepath.Dir(cfg.StateDir) + "/cost"
+	}
 
 	mux := http.NewServeMux()
 	s := &Server{cfg: cfg, logger: cfg.Logger}
@@ -119,7 +127,7 @@ func New(cfg Config) *Server {
 	mux.HandleFunc("GET /patterns", pat.handleList)
 
 	if cfg.StateDir != "" {
-		ch := newCostHandler(cfg.StateDir, cfg.Logger, cfg.RunPodClient)
+		ch := newCostHandler(cfg.StateDir, cfg.CostDir, cfg.Logger, cfg.RunPodClient)
 		mux.HandleFunc("GET /api/cost/roi", ch.handleROI)
 		mux.HandleFunc("GET /api/cost/roi/{pattern_id}", ch.handleROI)
 		mux.HandleFunc("GET /api/cost/usage", ch.handleUsage)

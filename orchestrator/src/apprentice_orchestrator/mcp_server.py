@@ -68,14 +68,25 @@ def _build_server():
         return out
 
     @mcp.tool()
-    def cost_summary(pattern_id: str) -> dict:
-        """ROI snapshot for one pattern: train cost, savings, break-even."""
-        return cost_mod.roi(cfg, pattern_id)
+    def get_roi(pattern_id: str = "") -> dict | list[dict]:
+        """ROI snapshot. With pattern_id returns a single pattern dict
+        (train_cost, saved, roi, broke_even, runs, broke_even_at).
+        Without pattern_id returns all patterns as a list."""
+        if pattern_id:
+            return cost_mod.roi(cfg, pattern_id)
+        return cost_mod.all_patterns_roi(cfg)
 
     @mcp.tool()
-    def list_roi() -> list[dict]:
-        """ROI snapshots for every pattern with ledger entries."""
-        return cost_mod.all_patterns_roi(cfg)
+    def get_usage(pattern_id: str = "", bucket: str = "day") -> list[dict]:
+        """Usage over time for specialist requests. Buckets: hour, day, week.
+        Returns [{time, requests, cost_saved}, ...]."""
+        pid = pattern_id if pattern_id else None
+        return cost_mod.usage_over_time(cfg, pid, bucket=bucket)
+
+    @mcp.tool()
+    def get_latency() -> dict:
+        """Specialist vs upstream latency stats (count, avg, p50, p95, p99)."""
+        return cost_mod.proxy_latency_stats(cfg)
 
     return mcp
 

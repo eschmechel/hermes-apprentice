@@ -86,6 +86,7 @@ def test_roi_computes_full_snapshot(orch_env):
     assert result["broke_even"] is True
     assert result["runs"] == 1
     assert result["broke_even_at"] == "2026-05-20T12:00:00Z"
+    assert result["earliest_saved"] == "2026-05-20T10:00:00Z"
 
 
 def test_roi_not_broke_even(orch_env):
@@ -170,8 +171,54 @@ def test_proxy_latency_stats(orch_env):
     assert stats["upstream"]["avg"] == 600.0
 
 
+def test_usage_over_time_week_bucket(orch_env):
+    cfg = orch_env
+    _write_proxy_log(cfg, [
+        {"time": "2026-05-20T10:00:00Z", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.01},
+        {"time": "2026-05-27T10:00:00Z", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.02},
+    ])
+
+    buckets = cost.usage_over_time(cfg, "p1", bucket="week")
+    assert len(buckets) == 2
+
+
 def test_proxy_latency_stats_empty(orch_env):
     cfg = orch_env
     stats = cost.proxy_latency_stats(cfg)
     assert stats["specialist"]["count"] == 0
     assert stats["upstream"]["count"] == 0
+
+
+def test_cli_cost_usage_flag(orch_env, capsys):
+    cfg = orch_env
+    _write_proxy_log(cfg, [
+        {"time": "2026-05-20T10:00:00Z", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.01},
+    ])
+    from apprentice_orchestrator import cli
+
+    rc = cli.main(["cost", "--usage", "--bucket", "day"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    data = json.loads(out)
+    assert len(data) >= 1
+    assert data[0]["requests"] >= 1
+
+
+def test_cli_cost_latency_flag(orch_env, capsys):
+    _write_proxy_log(orch_env, [
+        {"time": "2026-05-20T10:00:00Z", "route_decision": "specialist",
+         "pattern_id": "p1", "latency_ms": 100},
+        {"time": "2026-05-20T10:01:00Z", "route_decision": "upstream",
+         "model": "claude", "latency_ms": 300},
+    ])
+    from apprentice_orchestrator import cli
+
+    rc = cli.main(["cost", "--latency"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    data = json.loads(out)
+    assert data["specialist"]["count"] == 1
+    assert data["upstream"]["count"] == 1

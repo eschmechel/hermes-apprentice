@@ -27,7 +27,7 @@ func setupCostTest(t *testing.T, ledgerContent, proxyLogContent string) (*httpte
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
-	ch := newCostHandler(stateDir, logger, nil)
+	ch := newCostHandler(stateDir, costDir, logger, nil)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/cost/roi", ch.handleROI)
@@ -105,18 +105,19 @@ func TestE2E_ROI_SinglePattern(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var results []roiResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.StatusCode)
+	}
+
+	var result roiResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
+	if result.PatternID != "p1" {
+		t.Errorf("expected p1, got %s", result.PatternID)
 	}
-	if results[0].PatternID != "p1" {
-		t.Errorf("expected p1, got %s", results[0].PatternID)
-	}
-	if results[0].BrokeEven != true {
+	if result.BrokeEven != true {
 		t.Error("p1 should have broken even (saved 0.5 > cost 0.4)")
 	}
 }
@@ -153,16 +154,8 @@ func TestE2E_ROI_NonexistentPattern(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var results []roiResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
-		t.Fatal(err)
-	}
-
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result (empty pattern), got %d", len(results))
-	}
-	if results[0].PatternID != "nonexistent" {
-		t.Errorf("expected nonexistent, got %s", results[0].PatternID)
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected 404 for nonexistent pattern, got %d", resp.StatusCode)
 	}
 }
 
@@ -370,23 +363,18 @@ func TestE2E_ROI_MultipleRunsSamePattern(t *testing.T) {
 	}
 	defer resp.Body.Close()
 
-	var results []roiResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
+	var result roiResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		t.Fatal(err)
 	}
 
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
+	if result.TrainCost != 1.4 {
+		t.Errorf("train cost: expected 1.4 (0.4+0.8+0.2), got %f", result.TrainCost)
 	}
-
-	r := results[0]
-	if r.TrainCost != 1.4 {
-		t.Errorf("train cost: expected 1.4 (0.4+0.8+0.2), got %f", r.TrainCost)
+	if result.Runs != 3 {
+		t.Errorf("runs: expected 3, got %d", result.Runs)
 	}
-	if r.Runs != 3 {
-		t.Errorf("runs: expected 3, got %d", r.Runs)
-	}
-	if r.BrokeEven != true {
+	if result.BrokeEven != true {
 		t.Error("should have broken even (saved 1.5 > cost 1.4)")
 	}
 }

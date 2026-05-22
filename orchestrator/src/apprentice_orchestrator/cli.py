@@ -44,8 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="Show a job's state (or list recent jobs).")
     s.add_argument("--job-id", default=None)
 
-    c = sub.add_parser("cost", help="Print ROI analysis for one or all patterns.")
+    c = sub.add_parser("cost", help="Cost/ROI analysis: ledger ROI, usage over time, or latency stats.")
     c.add_argument("--pattern-id", default=None)
+    c.add_argument("--usage", action="store_true", help="Show usage over time (specialist requests per bucket).")
+    c.add_argument("--latency", action="store_true", help="Show specialist vs upstream latency stats.")
+    c.add_argument("--bucket", default="day", choices=["hour", "day", "week"],
+                   help="Time bucket for --usage (default: day).")
     return p
 
 
@@ -84,12 +88,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "cost":
-        if args.pattern_id:
+        if args.usage:
+            result = cost_mod.usage_over_time(cfg, args.pattern_id, bucket=args.bucket)
+        elif args.latency:
+            result = cost_mod.proxy_latency_stats(cfg)
+        elif args.pattern_id:
             result = cost_mod.roi(cfg, args.pattern_id)
         else:
             result = cost_mod.all_patterns_roi(cfg)
         print(json.dumps(result, indent=2))
-        return 0
+        return 0 if result else 1
 
     return 2
 

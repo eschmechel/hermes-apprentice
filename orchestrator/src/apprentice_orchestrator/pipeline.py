@@ -142,11 +142,6 @@ def run_pipeline(
         job.status = jobs.STATUS_PASSED
         job.current_step = None
         job.save(cfg.jobs_dir)
-        _train_step = next((s for s in job.steps if s.name == "train"), None)
-        if _train_step and _train_step.started_at and _train_step.ended_at:
-            from . import cost as cost_mod
-            cost_mod.record(cfg, pattern_id, job.job_id,
-                            _iso_diff_seconds(_train_step.started_at, _train_step.ended_at))
         LOG.info("pipeline passed; specialist promoted", extra={"pattern_id": pattern_id, "job_id": job.job_id})
 
     except PipelineError as e:
@@ -156,6 +151,19 @@ def run_pipeline(
         LOG.error("pipeline failed", extra={"pattern_id": pattern_id, "job_id": job.job_id, "error": str(e)})
         if e.gate_failed:
             _notify_failure(cfg, pattern_id, runner, logs_root)
+        return job
+
+    # Record cost outside the try/except so a ledger write failure doesn't
+    # silently swallow the passed pipeline, and a passed pipeline isn't
+    # downgraded to failed by a ledger I/O error.
+    _train_step = next((s for s in job.steps if s.name == "train"), None)
+    if _train_step and _train_step.started_at and _train_step.ended_at:
+        try:
+            from . import cost as cost_mod
+            cost_mod.record(cfg, pattern_id, job.job_id,
+                            _iso_diff_seconds(_train_step.started_at, _train_step.ended_at))
+        except Exception:
+            LOG.exception("failed to record training cost in ledger (pipeline already passed)")
     return job
 
 
