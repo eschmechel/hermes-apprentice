@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from apprentice_validator.promotion_gate import evaluate
 
 

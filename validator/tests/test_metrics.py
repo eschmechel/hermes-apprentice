@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from apprentice_validator.metrics import (
     compare_metrics,
     compute_metrics,
