@@ -277,15 +277,15 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
     if args.cmd == "burst":
-        tenant_id = args.tenant_id
-        if args.burst_cmd == "check":
-            result = flash_burst.can_burst(cfg, tenant_id, args.gpu)
-            print(json.dumps(result, indent=2))
-            return 0 if result["allowed"] else 1
         if args.burst_cmd == "list":
             result = flash_burst.list_gpu_types()
             print(json.dumps(result, indent=2))
             return 0
+        tenant_id = getattr(args, "tenant_id", None) or cfg.tenant_id
+        if args.burst_cmd == "check":
+            result = flash_burst.can_burst(cfg, tenant_id, args.gpu)
+            print(json.dumps(result, indent=2))
+            return 0 if result["allowed"] else 1
         if args.burst_cmd == "provision":
             result = flash_burst.provision_pod(cfg, tenant_id, gpu=args.gpu, gpu_count=args.gpu_count)
             print(json.dumps(result, indent=2))

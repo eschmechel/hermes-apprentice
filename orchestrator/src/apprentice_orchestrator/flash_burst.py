@@ -78,6 +78,7 @@ def _graphql(query: str, api_key: str, variables: dict | None = None) -> dict[st
     req = urllib.request.Request(RUNPOD_GRAPHQL_URL, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("User-Agent", "apprentice-burst/0.2")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read())
@@ -94,6 +95,7 @@ def _graphql(query: str, api_key: str, variables: dict | None = None) -> dict[st
 def _rest_get(path: str, api_key: str) -> dict[str, Any]:
     req = urllib.request.Request(f"{RUNPOD_API_URL}{path}")
     req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("User-Agent", "apprentice-burst/0.2")
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             return json.loads(resp.read())
