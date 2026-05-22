@@ -57,6 +57,21 @@ class Config:
     def baseline_path(self, pattern_id: str, version: str) -> Path:
         return self.root / "baselines" / f"{pattern_id}-{version}.jsonl"
 
+    # ---- cost / ROI --------------------------------------------------------
+    gpu_hourly_usd: float = field(default_factory=lambda: float(
+        _env("APPRENTICE_GPU_HOURLY_USD", "0.40")))
+    proxy_log_glob: str = field(default_factory=lambda: _env(
+        "APPRENTICE_PROXY_LOG_GLOB", ""))
+
+    @property
+    def cost_dir(self) -> Path:
+        return self.root / "cost"
+
+    def _resolve_proxy_log_glob(self) -> str:
+        if self.proxy_log_glob:
+            return self.proxy_log_glob
+        return str(self.root / "proxy" / "proxy.log")
+
     # ---- queues / state ----------------------------------------------------
     @property
     def decisions_dir(self) -> Path:
