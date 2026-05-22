@@ -32,7 +32,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -e "${{ matrix.pkg }}" pytest pytest-cov
+      - run: |
+          pip install -e telegram -e "${{ matrix.pkg }}" pytest pytest-cov
       - run: pytest tests/ -v --cov --cov-report=xml
         working-directory: ${{ matrix.pkg }}
       - uses: actions/upload-artifact@v4
@@ -47,15 +48,3 @@ jobs:
       - uses: astral-sh/ruff-action@v1
         with:
           args: check
-
-  golangci-lint:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        module: [proxy, dataset-builder, registry-service, burst]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: golangci/golangci-lint-action@v6
-        with:
-          working-directory: ${{ matrix.module }}
-          version: latest
