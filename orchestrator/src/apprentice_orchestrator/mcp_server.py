@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
-from . import jobs, requests
+from . import cost as cost_mod, jobs, requests
 from .config import Config
 from .jobs import JobState
 
@@ -66,6 +66,16 @@ def _build_server():
                     "description": data.get("description"),
                 })
         return out
+
+    @mcp.tool()
+    def cost_summary(pattern_id: str) -> dict:
+        """ROI snapshot for one pattern: train cost, savings, break-even."""
+        return cost_mod.roi(cfg, pattern_id)
+
+    @mcp.tool()
+    def list_roi() -> list[dict]:
+        """ROI snapshots for every pattern with ledger entries."""
+        return cost_mod.all_patterns_roi(cfg)
 
     return mcp
 
