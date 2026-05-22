@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/spf13/cobra v1.10.2
-	github.com/yalue/onnxruntime_go v1.24.0
+	github.com/yalue/onnxruntime_go v1.30.1
 )
 
 require (
