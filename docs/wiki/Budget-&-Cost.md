@@ -1,6 +1,6 @@
 # Budget & Cost
 
-Monetary budget system with Telegram-based increase flow. Controls cloud GPU spend at 80%, 95%, and 100% thresholds.
+Cloud GPU spending gets thresholds at 80%, 95%, and 100%. When the budget runs low, Apprentice asks via Telegram to raise it — no API keys needed on the operator side.
 
 ## How it works
 

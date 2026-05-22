@@ -54,8 +54,27 @@ def test_recommend_docker_in_vm():
 
 
 def test_recommend_docker_without_kvm():
+    """No KVM and not in VM — recommend 'none' (raw install)."""
     p, _ = recommend_profile(_env(has_kvm=False, in_vm=False))
-    assert p == "docker"
+    assert p == "none"
+
+
+def test_recommend_none_returned_when_no_kvm_and_no_docker():
+    """Even without docker binary, 'none' is the right fallback."""
+    p, _ = recommend_profile(_env(has_kvm=False, in_vm=False, has_docker=False))
+    assert p == "none"
+
+
+def test_cli_dry_run_with_none_profile(tmp_path, monkeypatch, capsys):
+    import apprentice_setup.cli as cli
+    monkeypatch.setattr(cli, "detect_environment", lambda: _env(has_kvm=False, in_vm=False))
+    rc = main([
+        "--non-interactive", "--home", str(tmp_path), "--profile", "none",
+    ])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "Dry run" in out
+    assert "none" in out
 
 
 def test_preflight_flags_missing_uv_and_gpu():

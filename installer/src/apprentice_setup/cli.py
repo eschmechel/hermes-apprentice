@@ -57,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Never prompt; use flags/defaults (for CI/scripts).")
     p.add_argument("--apply", action="store_true",
                    help="Execute the install plan (default: print it as a dry run).")
-    p.add_argument("--profile", choices=["firecracker", "docker"], default=None,
+    p.add_argument("--profile", choices=["firecracker", "docker", "none"], default=None,
                    help="Force an isolation profile (default: recommend from detection).")
     p.add_argument("--home", default=str(Path.home()), help="Home dir for ~/.apprentice (testing).")
 
@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         f"Isolation profile (recommended: {rec_profile} — {reason})",
         rec_profile, interactive=interactive,
     )
-    if profile not in ("firecracker", "docker"):
+    if profile not in ("firecracker", "docker", "none"):
         print(f"error: invalid profile {profile!r}", file=sys.stderr)
         return 2
 

@@ -28,9 +28,8 @@ def recommend_profile(env: Environment) -> tuple[str, str]:
     if env.in_vm:
         return ("docker", "running inside a VM; Docker avoids nested virtualization "
                 "(no /dev/kvm passthrough needed)")
-    if not env.has_kvm:
-        return ("docker", "no /dev/kvm available; Docker is the portable profile")
-    return ("docker", "defaulting to Docker (portable)")
+    return ("none", "no KVM available; install Apprentice binaries directly "
+            "alongside your existing Hermes — no isolation layer")
 
 
 def build_install_commands(

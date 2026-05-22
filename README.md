@@ -1,22 +1,20 @@
-# Apprentice — Hermes Agent that trains its own specialists (v0.2)
+# Apprentice — a Hermes Agent that trains its own specialists (v0.2)
 
-Hermes Agent accumulates Markdown skills from experience. **Apprentice** adds
-a second loop: when Hermes has handled a request pattern enough times, the
-Apprentice harvests `(input, big-model-output)` pairs from session history,
-fine-tunes a small Qwen2.5-1.5B specialist with Unsloth QLoRA, validates it
-against a held-out test set, and registers the result as a Hermes skill that
-routes future similar requests to a free local endpoint.
+Hermes Agent has skills — Markdown files that tell it how to handle a request.
+**Apprentice** adds a second loop: when Hermes has seen a pattern enough times,
+Apprentice grabs the `(user-input, big-model-output)` pairs, fine-tunes a
+little Qwen2.5-1.5B on them with Unsloth QLoRA, validates the result against a
+held-out test set, and registers it as a skill that routes future matches to a
+free local endpoint.
 
-Skills today are prompts. **Apprentice makes some of them weights.**
+Skills are prompts. **Apprentice turns some of them into weights.**
 
-Built for the [Hermes Agent Challenge](https://dev.to/challenges/hermes-agent-2026-05-15)
-(May 15–31, 2026). Base model: Qwen2.5-1.5B-Instruct (Apache 2.0). Hermes
-runs inside a Firecracker microVM; everything else runs on the host.
-
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Go Coverage](https://img.shields.io/badge/go%20coverage-65.2%25-yellow)](proxy/)
-[![Python Tests](https://img.shields.io/badge/python%20tests-328%20passed-green)](orchestrator/)
 [![Hermes Agent Challenge](https://img.shields.io/badge/contest-Hermes%20Agent%20Challenge-ff69b4)](https://dev.to/challenges/hermes-agent-2026-05-15)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+[![Python Tests](https://img.shields.io/badge/python%20tests-328%20passed-green)](orchestrator/)
+[![Go Coverage](https://img.shields.io/badge/go%20coverage-65%25-yellow)](proxy/)
+
+
 
 ## Architecture
 
@@ -144,22 +142,32 @@ hermes-apprentice/
 
 ### One-time setup
 
+Apprentice runs alongside Hermes. Pick your isolation profile:
+
 ```bash
-# Hermes microVM (~10 min)
+# Firecracker (bare-metal KVM, strongest isolation)
 bash .firecracker/bootstrap.sh
 .firecracker/vm.sh start
+
+# Docker (portable, works in VMs)
+docker compose -f deploy/docker/docker-compose.yml up -d
+
+# None (raw install — drop into an existing Hermes, no isolation)
+# Your Hermes should already be running on the host.
 
 # All-in-one installer (detects GPU, recommends profile, builds Go + Python, writes .env)
 apprentice-setup --apply
 
+# Explicit profile:
+apprentice-setup --apply --profile none    # raw, alongside existing Hermes
+apprentice-setup --apply --profile docker  # Docker containerized
+
 # With flags for scripting / CI:
-apprentice-setup --apply --non-interactive \
-    --telegram-token "$BOT_TOKEN" --telegram-chat-id "$CHAT_ID" \
-    --openrouter-key "$OPENROUTER_KEY" --base-model qwen2.5-1.5b \
+apprentice-setup --apply --non-interactive \\
+    --telegram-token "$BOT_TOKEN" --telegram-chat-id "$CHAT_ID" \\
+    --openrouter-key "$OPENROUTER_KEY" --base-model qwen2.5-1.5b \\
     --monthly-budget 20 --enable-monitoring
 ```
-
-`apprentice-setup --apply` runs the full install plan:
 
 1. Detects the host (GPU / KVM / Docker / uv) and recommends an isolation profile.
 2. Collects Telegram, OpenRouter, and RunPod API keys (optional — skippable).
@@ -281,14 +289,14 @@ docker compose -f deploy/docker/compose.monitoring.yml up -d
 
 ## Design choices
 
-- **Hermes lives in a microVM, never on the host** — Skill files are scp'd in.
-- **The proxy is the deterministic router; the SKILL.md is for ecosystem visibility.**
-- **Baseline is split from validate** (Option G) — separate CLIs, file seam, two LLMs never share GPU.
-- **Outgoing Telegram rides Hermes' cron adapter** — no python-telegram-bot on the host.
-- **Every training & registry manifest is Ed25519-signed.**
-- **Canary ramp is self-correcting** — warming→live as agreement scores prove safe, warming→broken if scores drop below threshold.
-- **Pattern merging requires operator approval** — MCP proposal → Telegram confirmation → regression gate against both parents.
-- **Budget enforcement gates cloud spend** — 80% warning, 95% pause, 100% block. Only bypass via Telegram `budget increase`.
+- **Hermes lives in a microVM.** Skill files get scp'd in. It never runs on the host.
+- **The proxy routes deterministically.** Cosine matching on BGE-small embeddings. The SKILL.md is for ecosystem visibility, not routing.
+- **Baseline is split from validate.** Two separate CLIs with a file seam between them — so the base model and specialist never share a GPU.
+- **Telegram rides Hermes' cron adapter.** No python-telegram-bot on the host.
+- **Every manifest is signed.** Training and registry manifests use Ed25519 key pairs.
+- **Canary is self-correcting.** Warming→live as agreement stays above threshold. Warming→broken if it drops.
+- **Merging requires operator approval.** MCP proposal → Telegram confirmation → regression gate against both parents.
+- **Budget gates cloud spend.** 80% warning, 95% pause, 100% block. Increase only via Telegram `budget increase`.
 
 ## Known gaps
 

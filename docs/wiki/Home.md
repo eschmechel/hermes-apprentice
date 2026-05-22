@@ -1,8 +1,12 @@
 # Apprentice v0.2
 
-Hermes Agent accumulates Markdown skills from experience. Apprentice adds a second loop: when Hermes has handled a request pattern enough times, the Apprentice harvests `(input, big-model-output)` pairs from session history, fine-tunes a small Qwen2.5 specialist with Unsloth QLoRA, validates it against a held-out test set, and registers the result as a Hermes skill that routes future similar requests to a free local endpoint.
+Hermes Agent has skills — Markdown files that tell it how to handle a request.
+Apprentice adds a second loop: when Hermes has seen a pattern enough times,
+Apprentice grabs the user/model pairs, fine-tunes a little Qwen2.5 on them,
+validates the result, and registers it as a skill that routes future matches
+to a free local endpoint.
 
-Skills today are prompts. Apprentice makes some of them weights.
+Skills are prompts. **Apprentice turns some of them into weights.**
 
 ## Pages
 

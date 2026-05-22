@@ -1,6 +1,6 @@
 # Canary & Safety
 
-Safe specialist rollout using a canary ramp state machine. New specialists start at 5% traffic and auto-advance as agreement scores prove they match upstream quality.
+New specialists don't get full traffic on day one. A canary ramp state machine starts them at 5% and auto-advances as agreement scores show they match upstream quality.
 
 ## States
 
@@ -105,15 +105,15 @@ Canary state is persisted to JSON (`~/.apprentice/proxy/canary/canary_state.json
 
 ## Recovery from broken
 
-A broken specialist must be manually fixed:
+A broken specialist needs manual attention:
 
 1. Investigate the failure (check agreement scores, compare responses).
-2. Re-train or fix the issue.
-3. Manually set state back to `warming`:
+2. Re-train or fix the underlying issue.
+3. Set state back to `warming`:
    ```bash
    curl -X POST http://localhost:8083/canary/set-state \
        -d '{"pattern_id":"p1","state":"warming","pct":5}'
    ```
-4. The ramp auto-advances from there.
+4. The ramp picks up from there automatically.
 
 See [Monitoring](Monitoring) for Grafana dashboards that visualize canary state transitions.
