@@ -14,10 +14,15 @@ jobs:
         module: [proxy, dataset-builder, registry-service, burst]
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
       - uses: github/codeql-action/init@v3
         with:
           languages: go
-          source-root: ${{ matrix.module }}
+      - run: |
+          cd ${{ matrix.module }}
+          go build ./...
       - uses: github/codeql-action/analyze@v3
 
   analyze-python:
