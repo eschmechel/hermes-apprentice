@@ -171,6 +171,7 @@ select {
       <button :class="{ active: tab === 'roi' }" @click="tab = 'roi'; fetchAll()">ROI</button>
       <button :class="{ active: tab === 'usage' }" @click="tab = 'usage'; fetchUsage()">Usage</button>
       <button :class="{ active: tab === 'latency' }" @click="tab = 'latency'; fetchLatency()">Latency</button>
+      <button :class="{ active: tab === 'pods' }" @click="tab = 'pods'; fetchRunPod()">Pods</button>
     </div>
 
     <div v-if="tab === 'roi'">
@@ -256,6 +257,64 @@ select {
         </div>
       </div>
     </div>
+
+    <div v-if="tab === 'pods'">
+      <div class="card">
+        <h2>RunPod Pods</h2>
+        <div v-if="runpodError" style="text-align: center; padding: 2rem;">
+          <p style="color: var(--pumpkin); margin-bottom: 1rem;">{{ runpodError }}</p>
+          <p style="color: var(--text-dim); font-size: 0.85rem;">
+            Configure with <code style="background: var(--charcoal); padding: 0.2rem 0.5rem; border-radius: 4px; color: var(--pollen);">--runpod-api-key</code>
+          </p>
+        </div>
+        <div v-else-if="!runpod" class="loading">Loading pod data...</div>
+        <div v-else>
+          <div class="stats-grid" style="margin-bottom: 1rem;">
+            <div class="stat-card">
+              <div class="label">Active Pods</div>
+              <div class="value">{{ runpod.pods ? runpod.pods.length : 0 }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Total Cost / Hr</div>
+              <div class="value" style="color: var(--tuscan);">$ {{ runpod.total_cost_hr.toFixed(4) }}</div>
+            </div>
+            <div class="stat-card">
+              <div class="label">Total Accrued</div>
+              <div class="value" style="color: var(--pumpkin);">$ {{ runpod.total_accrued.toFixed(4) }}</div>
+            </div>
+          </div>
+          <table v-if="runpod.pods && runpod.pods.length > 0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>$/Hr</th>
+                <th>Uptime</th>
+                <th>Accrued</th>
+                <th>GPU</th>
+                <th>Mem</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in runpod.pods" :key="p.id">
+                <td style="color: var(--pollen);">{{ p.name }}</td>
+                <td>
+                  <span class="badge" :class="p.status === 'RUNNING' ? 'positive' : 'negative'">
+                    {{ p.status }}
+                  </span>
+                </td>
+                <td>$ {{ p.cost_per_hr.toFixed(4) }}</td>
+                <td>{{ p.uptime_hours.toFixed(1) }}h</td>
+                <td>$ {{ p.accrued_cost.toFixed(4) }}</td>
+                <td>{{ p.gpu_util_pct.toFixed(0) }}%</td>
+                <td>{{ p.memory_util_pct.toFixed(0) }}%</td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-else style="text-align: center; color: var(--text-dim); padding: 2rem;">No active pods.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -268,6 +327,8 @@ createApp({
     const roi = ref([]);
     const usage = ref([]);
     const latency = ref(null);
+    const runpod = ref(null);
+    const runpodError = ref('');
     const lastRefresh = ref('--:--:--');
     const usagePattern = ref('');
     const usageBucket = ref('day');
@@ -310,6 +371,27 @@ createApp({
         latency.value = data;
       } catch (e) {
         latency.value = null;
+      }
+      lastRefresh.value = fmtTime();
+    }
+
+    async function fetchRunPod() {
+      try {
+        const res = await fetch('/api/cost/runpod');
+        if (res.status === 503) {
+          runpodError.value = 'RunPod API key is not configured.';
+          runpod.value = null;
+        } else if (!res.ok) {
+          runpodError.value = 'RunPod API error (HTTP ' + res.status + ').';
+          runpod.value = null;
+        } else {
+          const data = await res.json();
+          runpod.value = data;
+          runpodError.value = '';
+        }
+      } catch (e) {
+        runpodError.value = 'Failed to reach RunPod API.';
+        runpod.value = null;
       }
       lastRefresh.value = fmtTime();
     }
@@ -374,9 +456,9 @@ createApp({
     onMounted(() => { fetchAll(); });
 
     return {
-      tab, roi, usage, latency, lastRefresh,
+      tab, roi, usage, latency, runpod, runpodError, lastRefresh,
       usagePattern, usageBucket, usageChart,
-      fetchAll, fetchUsage, fetchLatency,
+      fetchAll, fetchUsage, fetchLatency, fetchRunPod,
     };
   }
 }).mount('#app');
