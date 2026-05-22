@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -27,6 +28,7 @@ func serveCmd() *cobra.Command {
 		ortLibPath     string
 		matchThreshold float64
 		shadowRate     float64
+		logFile        string
 	)
 
 	cmd := &cobra.Command{
@@ -43,7 +45,16 @@ Hermes integration: configure your Hermes profile's model_url to the proxy's
 listen address (e.g. http://localhost:8083/v1).  The proxy speaks the OpenAI
 chat-completions schema, so request and response shapes are unchanged.`,
 		RunE: func(c *cobra.Command, _ []string) error {
-			logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+			var logWriter io.Writer = os.Stderr
+			if logFile != "" {
+				fh, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+				if err != nil {
+					return err
+				}
+				defer fh.Close()
+				logWriter = io.MultiWriter(os.Stderr, fh)
+			}
+			logger := slog.New(slog.NewJSONHandler(logWriter, nil))
 			logger.Info("proxy starting",
 				"listen", listenAddr,
 				"upstream_url", upstreamURL,
@@ -124,5 +135,6 @@ chat-completions schema, so request and response shapes are unchanged.`,
 	cmd.Flags().StringVar(&ortLibPath, "onnxruntime-lib", "/usr/lib/libonnxruntime.so", "Path to libonnxruntime.so (empty = use ORT default search)")
 	cmd.Flags().Float64Var(&matchThreshold, "match-threshold", 0.78, "Minimum cosine similarity to consider a pattern matched")
 	cmd.Flags().Float64Var(&shadowRate, "shadow-rate", 0.05, "Fraction of matched requests to also send to upstream for shadow comparison (0..1)")
+	cmd.Flags().StringVar(&logFile, "log-file", "", "Write JSON request log to file in addition to stderr (default: no file)")
 	return cmd
 }
