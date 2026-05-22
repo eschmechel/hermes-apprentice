@@ -86,6 +86,10 @@ type Config struct {
 	// Defaults to filepath.Dir(StateDir)/cost when empty.
 	CostDir string
 
+	// RegistryRoot is the Apprentice model registry directory.
+	// Defaults to filepath.Dir(StateDir)/registry when empty.
+	RegistryRoot string
+
 	// RunPodClient provides live RunPod pod cost data for /api/cost/runpod.
 	// When nil, the endpoint returns 503 (not configured).
 	RunPodClient *runpod.Client
@@ -109,6 +113,9 @@ func New(cfg Config) *Server {
 	}
 	if cfg.CostDir == "" && cfg.StateDir != "" {
 		cfg.CostDir = filepath.Dir(cfg.StateDir) + "/cost"
+	}
+	if cfg.RegistryRoot == "" && cfg.StateDir != "" {
+		cfg.RegistryRoot = filepath.Dir(cfg.StateDir) + "/registry"
 	}
 
 	mux := http.NewServeMux()
@@ -134,6 +141,9 @@ func New(cfg Config) *Server {
 		mux.HandleFunc("GET /api/cost/latency", ch.handleLatency)
 		mux.HandleFunc("GET /api/cost/runpod", ch.handleRunPod)
 		mux.HandleFunc("GET /dashboard", s.handleDashboard)
+
+		rh := newRegistryHandler(cfg.RegistryRoot, cfg.Logger)
+		mux.HandleFunc("GET /api/registry/{pattern_id}/latest", rh.handleLatest)
 	}
 
 	if cfg.Metrics != nil {
