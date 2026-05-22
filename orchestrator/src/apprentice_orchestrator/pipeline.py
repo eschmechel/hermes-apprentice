@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Callable
 
+from datetime import datetime, timezone
+
 from . import jobs, placement
 from .config import Config, latest_version_dir
 from .jobs import JobState
@@ -140,6 +142,11 @@ def run_pipeline(
         job.status = jobs.STATUS_PASSED
         job.current_step = None
         job.save(cfg.jobs_dir)
+        _train_step = next((s for s in job.steps if s.name == "train"), None)
+        if _train_step and _train_step.started_at and _train_step.ended_at:
+            from . import cost as cost_mod
+            cost_mod.record(cfg, pattern_id, job.job_id,
+                            _iso_diff_seconds(_train_step.started_at, _train_step.ended_at))
         LOG.info("pipeline passed; specialist promoted", extra={"pattern_id": pattern_id, "job_id": job.job_id})
 
     except PipelineError as e:
@@ -185,6 +192,13 @@ def _parse_verdict(stdout: str) -> dict | None:
         except json.JSONDecodeError:
             start = stdout.find("{", start + 1)
     return None
+
+
+def _iso_diff_seconds(start: str, end: str) -> float:
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    a = datetime.strptime(start, fmt).replace(tzinfo=timezone.utc)
+    b = datetime.strptime(end, fmt).replace(tzinfo=timezone.utc)
+    return (b - a).total_seconds()
 
 
 def _notify_failure(cfg: Config, pattern_id: str, runner: Runner, logs_root: Path) -> None:
