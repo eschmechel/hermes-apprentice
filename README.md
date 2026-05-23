@@ -74,7 +74,7 @@ flowchart LR
     P -- upstream fallback --> OR[(OpenRouter<br/>+ multi-provider)]
     TG_BOT -.via Hermes cron.-> User[Telegram channel]
     User -.replies.-> TG_BOT
-    VAL --> SKILL[/.hermes/skills/{id}/SKILL.md]
+    VAL --> SKILL[/.hermes/skills/id/SKILL.md]
     SKILL -.next session.-> H
 
     classDef done fill:#1f9d55,stroke:#0d6e3a,color:#fff;
