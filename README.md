@@ -20,7 +20,8 @@ Skills are prompts. **Apprentice turns some of them into weights.**
 ## Architecture
 
 ```mermaid
-flowchart LR
+%%{init: {'themeVariables': {'fontSize': '16px'}, 'flowchart': {'nodeSpacing': 50, 'rankSpacing': 70}}}%%
+flowchart TB
     subgraph microVM["Firecracker microVM (Hermes)"]
         H[Hermes Agent<br/>v0.14.0]
         CRON[hermes cron<br/>no_agent jobs]
