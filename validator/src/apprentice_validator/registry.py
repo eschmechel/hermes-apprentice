@@ -187,14 +187,21 @@ def promote(
             "The model was not signed by an authorized trainer — cannot promote."
         )
 
-    dest.mkdir(parents=True, exist_ok=True)
+    # Atomic promote (W9): assemble in a sibling temp dir, then os.replace into
+    # v<N>. A crash mid-build leaves the build dir (cleaned next call), never a
+    # half-promoted v<N>, and `latest` is never advanced past an incomplete copy.
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    build = skill_dir / f".v{new_version}.build"
+    if build.exists():
+        shutil.rmtree(build)
+    build.mkdir(parents=True)
 
     # Copy model files (everything in model_dir that isn't the manifest/sig).
     copied = 0
     for item in model_dir.iterdir():
         if item.name in (MANIFEST_SOURCE, f"{MANIFEST_SOURCE}.sig"):
             continue
-        target = dest / item.name
+        target = build / item.name
         if item.is_dir():
             shutil.copytree(item, target, dirs_exist_ok=True)
         else:
@@ -202,10 +209,10 @@ def promote(
         copied += 1
 
     # Copy training manifest + signature.
-    shutil.copy2(training_manifest, dest / MANIFEST_SOURCE)
+    shutil.copy2(training_manifest, build / MANIFEST_SOURCE)
     sig_src = model_dir / f"{MANIFEST_SOURCE}.sig"
     if sig_src.exists():
-        shutil.copy2(sig_src, dest / f"{MANIFEST_SOURCE}.sig")
+        shutil.copy2(sig_src, build / f"{MANIFEST_SOURCE}.sig")
     copied += 2 if sig_src.exists() else 1
 
     # Read base_model and merge lineage from the training manifest.
@@ -220,7 +227,7 @@ def promote(
         LOG.warning("could not read training manifest",
                     extra={"path": str(training_manifest), "error": str(e)})
 
-    # Write registry manifest.
+    # Write registry manifest (model_dir points at the final dest, post-rename).
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "pattern_id": pattern_id,
@@ -233,12 +240,20 @@ def promote(
     }
     if merged_from:
         manifest["merged_from"] = merged_from
-    reg_manifest_path = dest / REGISTRY_MANIFEST
+    reg_manifest_path = build / REGISTRY_MANIFEST
     payload = json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
     reg_manifest_path.write_text(payload, encoding="utf-8")
 
     # Sign the registry manifest.
     sign_manifest(reg_manifest_path, key_dir)
+
+    # Verify the build is complete before committing it (no half-promoted v<N>).
+    if not (build / REGISTRY_MANIFEST).exists() or not (build / f"{REGISTRY_MANIFEST}.sig").exists():
+        shutil.rmtree(build, ignore_errors=True)
+        raise RuntimeError(f"promote build incomplete for {pattern_id} v{new_version}")
+
+    # Atomic commit: rename the build dir into the final v<N>.
+    os.replace(build, dest)
 
     # Advance the `latest` pointer (W10). Best-effort: a filesystem that can't
     # symlink shouldn't fail the promotion (readers fall back to highest v<N>).

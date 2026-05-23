@@ -188,3 +188,24 @@ def test_gc_keeps_newest_and_latest(tmp_path: Path, fake_model_dir: Path, key_di
     assert set(pruned) == {1, 3}
     assert registry.list_versions(reg_root / "g") == [2, 4, 5]
     assert registry.current_version(reg_root / "g") == 2  # latest untouched
+
+
+# ── W9: atomic promote ───────────────────────────────────────────────────────
+
+def test_promote_is_atomic_no_partial_version(tmp_path, fake_model_dir, key_dir, monkeypatch):
+    """If signing fails mid-promote, no v<N> directory is left behind (the build
+    happens in a temp dir that's only renamed into place once complete)."""
+    from apprentice_validator import registry as reg
+    reg_root = tmp_path / "reg"
+
+    def boom(*a, **k):
+        raise RuntimeError("signing blew up")
+
+    monkeypatch.setattr(reg, "sign_manifest", boom)
+    with pytest.raises(RuntimeError):
+        reg.promote(pattern_id="atomic", model_dir=fake_model_dir, scores={},
+                    registry_root=reg_root, key_dir=key_dir)
+
+    skill = reg_root / "atomic"
+    assert not (skill / "v1").exists()          # no half-promoted version
+    assert reg.current_version(skill) is None    # latest never advanced

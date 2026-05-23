@@ -73,3 +73,69 @@ def test_profile_flag_passed_when_configured(orch_env, runner_factory, monkeypat
     pipeline.run_pipeline("p1", cfg=cfg, dataset_dir=str(ds), runner=runner)
     train_call = next(j for j in runner.joined() if "apprentice-train" in j)
     assert "--profile /some/profile.yaml" in train_call
+
+
+# ── W9: resume + OOM auto-retry ──────────────────────────────────────────────
+
+def test_oom_retry_smaller_footprint(orch_env, runner_factory):
+    cfg = orch_env
+    ds = _dataset(cfg)
+    # First train (no batch flag) OOMs; the retry (with --batch-size 1) succeeds.
+    # Insertion order matters: the retry key is checked before the generic one.
+    runner = runner_factory({
+        "--batch-size 1": (0, ""),
+        "apprentice-train": (1, "RuntimeError: CUDA out of memory. Tried to allocate"),
+    })
+    job = pipeline.run_pipeline("p1", cfg=cfg, dataset_dir=str(ds), runner=runner)
+
+    assert job.status == jobs.STATUS_PASSED
+    train_steps = [s for s in job.steps if s.name == "train"]
+    assert len(train_steps) == 2  # failed attempt + successful retry
+    assert train_steps[0].status == jobs.STATUS_FAILED
+    assert train_steps[1].status == jobs.STATUS_PASSED
+    assert any("--batch-size 1 --max-seq-len 768" in j for j in runner.joined())
+
+
+def test_oom_retry_not_triggered_for_non_oom_failure(orch_env, runner_factory):
+    cfg = orch_env
+    ds = _dataset(cfg)
+    runner = runner_factory({"apprentice-train": (1, "some other error")})
+    job = pipeline.run_pipeline("p1", cfg=cfg, dataset_dir=str(ds), runner=runner)
+    assert job.status == jobs.STATUS_FAILED
+    # only one train attempt, no retry with the smaller footprint
+    assert not any("--batch-size 1" in j for j in runner.joined())
+
+
+def test_resume_skips_already_passed_steps(orch_env, runner_factory):
+    cfg = orch_env
+    ds = _dataset(cfg)
+    # A prior run got through baseline, then crashed before validate.
+    prior = jobs.JobState(job_id="p1-resume01", pattern_id="p1")
+    for name in ("train", "sign", "merge", "baseline"):
+        st = jobs.StepState(name=name, status=jobs.STATUS_PASSED,
+                            started_at="2026-05-21T10:00:00Z", ended_at="2026-05-21T10:05:00Z")
+        prior.steps.append(st)
+    prior.save(cfg.jobs_dir)
+
+    # This runner FAILS if train/merge/baseline are re-invoked — so the test
+    # proves they were skipped. validate succeeds.
+    def runner(argv, log_path):
+        j = " ".join(argv)
+        if any(x in j for x in ("apprentice-train", "apprentice-merge", "apprentice-baseline")):
+            return 1, "", "should not have re-run this step"
+        return 0, json.dumps({"verdict": {"passed": True}}), ""
+
+    job = pipeline.run_pipeline("p1", cfg=cfg, dataset_dir=str(ds), job=prior, runner=runner)
+    assert job.status == jobs.STATUS_PASSED
+
+
+def test_resume_false_reruns_everything(orch_env, runner_factory):
+    cfg = orch_env
+    ds = _dataset(cfg)
+    prior = jobs.JobState(job_id="p1-clean01", pattern_id="p1")
+    prior.steps.append(jobs.StepState(name="train", status=jobs.STATUS_PASSED,
+                                      started_at="2026-05-21T10:00:00Z", ended_at="2026-05-21T10:05:00Z"))
+    runner = runner_factory({"apprentice-validate": (0, json.dumps({"ok": True}))})
+    pipeline.run_pipeline("p1", cfg=cfg, dataset_dir=str(ds), job=prior, runner=runner, resume=False)
+    # train was re-invoked despite the prior passed step
+    assert any("apprentice-train" in j for j in runner.joined())
