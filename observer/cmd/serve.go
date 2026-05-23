@@ -16,6 +16,8 @@ import (
 	"github.com/eschmechel/hermes-apprentice/observer/internal/normalizer"
 	"github.com/eschmechel/hermes-apprentice/observer/internal/pairing"
 	"github.com/eschmechel/hermes-apprentice/observer/internal/poller"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/source"
+	"github.com/eschmechel/hermes-apprentice/observer/internal/source/openailog"
 	"github.com/eschmechel/hermes-apprentice/observer/internal/state"
 	"github.com/eschmechel/hermes-apprentice/observer/internal/store"
 	"github.com/spf13/cobra"
@@ -25,7 +27,9 @@ import (
 func serveCmd() *cobra.Command {
 	var (
 		listenAddr    string
+		sourceKind    string
 		hermesDBPath  string
+		openAILogPath string
 		observerDB    string
 		pollInterval  time.Duration
 		fromBeginning bool
@@ -36,10 +40,15 @@ func serveCmd() *cobra.Command {
 		Use:   "serve",
 		Short: "Run the observer: poll Hermes DB, write normalized records, serve HTTP.",
 		RunE: func(c *cobra.Command, _ []string) error {
+			if sourceKind != "hermes" && sourceKind != "openai-log" {
+				return fmt.Errorf("--source must be 'hermes' or 'openai-log', got %q", sourceKind)
+			}
 			logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 			logger.Info("observer starting",
 				"listen", listenAddr,
+				"source", sourceKind,
 				"hermes_db", hermesDBPath,
+				"openai_log", openAILogPath,
 				"observer_db", observerDB,
 				"poll_interval", pollInterval,
 				"dedup_window", dedupWindow,
@@ -68,13 +77,17 @@ func serveCmd() *cobra.Command {
 
 			// Read-only connection to Hermes DB for sessions enrichment (model,
 			// system_prompt). Separate from the poller's connection so query
-			// contention is bounded by SQLite WAL, not driver mutex.
-			hermesEnrichDSN := fmt.Sprintf("file:%s?mode=ro&_journal_mode=WAL", hermesDBPath)
-			hermesEnrich, err := sql.Open("sqlite", hermesEnrichDSN)
-			if err != nil {
-				return fmt.Errorf("open hermes for enrichment: %w", err)
+			// contention is bounded by SQLite WAL, not driver mutex. Only the
+			// hermes source has a sessions table; openai-log enriches to nothing.
+			var hermesEnrich *sql.DB
+			if sourceKind == "hermes" {
+				hermesEnrichDSN := fmt.Sprintf("file:%s?mode=ro&_journal_mode=WAL", hermesDBPath)
+				hermesEnrich, err = sql.Open("sqlite", hermesEnrichDSN)
+				if err != nil {
+					return fmt.Errorf("open hermes for enrichment: %w", err)
+				}
+				defer hermesEnrich.Close()
 			}
-			defer hermesEnrich.Close()
 
 			pairer := pairing.New(obsStore, hermesEnrich, logger.With("component", "pairer"))
 
@@ -110,19 +123,36 @@ func serveCmd() *cobra.Command {
 				return hwm.Set(m.ID)
 			}
 
-			poll := poller.New(poller.Config{
-				HermesDBPath:       hermesDBPath,
-				Interval:           pollInterval,
-				Logger:             logger.With("component", "poller"),
-				Handler:            handler,
-				StartFromBeginning: fromBeginning,
-				StartFromID:        hwm.Get(),
-			})
+			// SessionSource seam (W2): hermes DB poller or generic openai-log.
+			var src source.SessionSource
+			switch sourceKind {
+			case "openai-log":
+				if openAILogPath == "" {
+					return fmt.Errorf("--openai-log is required with --source openai-log")
+				}
+				src = openailog.New(openailog.Config{
+					LogPath:            openAILogPath,
+					Interval:           pollInterval,
+					Logger:             logger.With("component", "openai-log"),
+					Handler:            handler,
+					StartFromBeginning: fromBeginning,
+					StartFromID:        hwm.Get(),
+				})
+			default: // hermes
+				src = poller.New(poller.Config{
+					HermesDBPath:       hermesDBPath,
+					Interval:           pollInterval,
+					Logger:             logger.With("component", "poller"),
+					Handler:            handler,
+					StartFromBeginning: fromBeginning,
+					StartFromID:        hwm.Get(),
+				})
+			}
 
 			httpErr := make(chan error, 1)
 			pollErr := make(chan error, 1)
 			go func() { httpErr <- srv.ListenAndServe(ctx) }()
-			go func() { pollErr <- poll.Run(ctx) }()
+			go func() { pollErr <- src.Run(ctx) }()
 
 			select {
 			case <-ctx.Done():
@@ -144,6 +174,8 @@ func serveCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&listenAddr, "listen", ":8080", "HTTP listen address")
+	cmd.Flags().StringVar(&sourceKind, "source", "hermes", "Session source: 'hermes' (tail the Hermes state.db) or 'openai-log' (tail a generic OpenAI req/resp JSONL)")
+	cmd.Flags().StringVar(&openAILogPath, "openai-log", "", "Path to the OpenAI req/resp JSONL (required with --source openai-log)")
 	cmd.Flags().StringVar(&hermesDBPath, "hermes-db", "/root/.hermes/state.db", "Path to the Hermes session DB to tail")
 	cmd.Flags().StringVar(&observerDB, "observer-db", "/root/.apprentice/observer.db", "Path to the observer's own SQLite store")
 	cmd.Flags().DurationVar(&pollInterval, "poll-interval", time.Second, "How often to poll the Hermes DB for new messages")
