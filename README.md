@@ -1,14 +1,13 @@
-# Apprentice — specialist training infrastructure for agent teams (v0.2)
+# Apprentice — specialist training infrastructure for Hermes (v0.2)
 
 Hermes Agent has skills — Markdown files that tell it how to handle a request.
-**Apprentice** adds a second loop: when an agent (or several) has seen a pattern
-enough times, Apprentice grabs the `(user-input, big-model-output)` pairs, fine-tunes
-a little Qwen2.5-1.5B on them with Unsloth QLoRA, validates the result against a
-held-out test set, and registers it as a specialist that routes future matches to a
-free local endpoint — for every agent in the team.
+**Apprentice** adds a second loop: when Hermes has seen a pattern enough times,
+Apprentice grabs the `(user-input, big-model-output)` pairs, fine-tunes a little
+Qwen2.5-1.5B on them with Unsloth QLoRA, validates the result against a held-out
+test set, and registers it as a specialist that routes future matches to a free
+local endpoint.
 
 Skills are prompts. **Apprentice turns some of them into weights.**
-**One specialist, shared by every agent that needs it.**
 
 [![Hermes Agent Challenge](https://img.shields.io/badge/contest-Hermes%20Agent%20Challenge-ff69b4)](https://dev.to/challenges/hermes-agent-2026-05-15)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -71,7 +70,7 @@ flowchart TB
     end
 
     P -- canary ramp --> CANARY[Canary Manager]
-    P -- team auth --> TENANTS[(Tenants/)]
+    P -- tenant auth --> TENANTS[(Tenants/)]
     P -- upstream fallback --> OR[(OpenRouter<br/>+ multi-provider)]
     TG_BOT -.via Hermes cron.-> User[Telegram channel]
     User -.replies.-> TG_BOT
@@ -89,7 +88,7 @@ flowchart TB
 | **Canary Ramp** | Specialist rollouts start at 5% traffic, auto-advance to 100% as agreement scores prove safe. Broken specialists are quarantined automatically. |
 | **Multi-Base-Model** | Train on Qwen2.5-1.5B (default), Qwen2.5-3B, or Llama-3.2-3B. User-editable `supported_models.yaml`. |
 | **Pattern Merging** | Combine two specialists into one. MCP `propose_merge` → Telegram approval → merged dataset → regression gate. |
-| **Multi-Team** | `X-Apprentice-Tenant` header + API key auth. Per-team rate limiting, quota management, global patterns. |
+| **Multi-Tenant** | `X-Apprentice-Tenant` header + API key auth. Per-tenant rate limiting, quota management, global patterns. |
 | **Monthly Budget** | Monetary budget with Telegram alerts at 80%/95%/100% thresholds. On-demand increase via `budget increase $N` reply. |
 | **Grafana Dashboards** | 8-panel dashboard: request rate, latency p50/p95/p99, error rate, cost saved, top patterns, specialist-vs-upstream latency, status pie, 24h counters. |
 | **RunPod Burst** | Cloud training on A100/A6000/L40S. GPU type auto-selection, budget-gated provisioning. |
@@ -98,10 +97,10 @@ flowchart TB
 ## How a request flows
 
 1. Hermes' chat endpoint points at the local **Proxy** (`:8083/v1/chat/completions`).
-2. **Auth**: If `--tenant-root` is set, `X-Apprentice-Tenant` + `X-Apprentice-Key` headers are validated (each tenant is an agent team or org unit).
-3. **Rate check**: Per-team token bucket enforced if `--tenant-ratelimit-rpm` is set.
+2. **Auth**: If `--tenant-root` is set, `X-Apprentice-Tenant` + `X-Apprentice-Key` headers are validated against per-tenant API keys.
+3. **Rate check**: Per-tenant token bucket enforced if `--tenant-ratelimit-rpm` is set.
 4. **Embed**: Last user message embedded with BGE-small ONNX (384-dim, L2-normalized).
-5. **Match**: Cosine similarity against registered pattern centroids, scoped to team + global.
+5. **Match**: Cosine similarity against registered pattern centroids, scoped to tenant + global.
 6. **Alias resolution**: Pattern ID may be aliased (for merged patterns).
 7. **Canary check**: Warming patterns route probabilistically (5%→100%), broken patterns are quarantined.
 8. **Route**: Match → local specialist (free, ~38ms). No match → upstream fallback (OpenRouter, paid).
@@ -120,7 +119,7 @@ hermes-apprentice/
 ├── trainer/              — Py    Unsloth QLoRA + manifest signer + multi-base-model
 ├── validator/            — Py    Baseline runner + promotion gate + registry + merge regression
 ├── serving/              — Py    vLLM HTTP server + residency control plane
-├── proxy/                — Go    OpenAI-compat router with canary/teams/ratelimit/aliases/cost
+├── proxy/                — Go    OpenAI-compat router with canary/tenants/ratelimit/aliases/cost
 ├── registry-service/     — Go    Read-only HTTP over ~/.apprentice/registry/
 ├── orchestrator/         — Py    Autonomous pipeline driver + MCP tools + budget/quota/safety
 ├── telegram/             — Py    Templates + outbox + getUpdates reply poller
@@ -249,9 +248,9 @@ ssh root@GUEST 'hermes cron create --name apprentice-poll-replies --no-agent \
 
 Reply commands: `train gc-abcd1234`, `skip gc-abcd1234`, `details gc-abcd1234`, `budget increase 10`.
 
-### Multi-team setup (tenants)
+### Multi-tenant setup
 
-# Register teams
+# Register tenants
 
 apprentice-orchestrator quota set --tenant acme --max-loras 5
 
@@ -261,7 +260,7 @@ apprentice-orchestrator budget set --tenant acme --monthly 100
 
 proxy serve --tenant-root ~/.apprentice/tenants --global-api-key "admin-secret"
 
-# Each team gets a unique key
+# Each tenant gets a unique key
 
 curl -H "X-Apprentice-Tenant: acme" -H "X-Apprentice-Key: &lt;tenant-key&gt;" ...
 ```
