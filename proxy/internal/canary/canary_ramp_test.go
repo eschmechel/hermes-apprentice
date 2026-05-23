@@ -296,10 +296,10 @@ func TestSetStateUnknown(t *testing.T) {
 
 func TestDecisionWarmingPctZero(t *testing.T) {
 	dir := t.TempDir()
-	m, _ := New(filepath.Join(dir, "canary.json"), Config{
-		StartPct: 0, StepPct: 10, StepRequests: 10, AgreementThresh: 0.8,
-	})
+	m, _ := New(filepath.Join(dir, "canary.json"), DefaultConfig())
+	m.randFn = fixedRand(0.0)
 	_ = m.Register("p1")
+	_ = m.SetState("p1", StateWarming, 0)
 	route, managed := m.Decision("p1")
 	if route {
 		t.Fatal("expected route=false at 0%")
