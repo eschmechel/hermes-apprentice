@@ -59,6 +59,18 @@ class PipelineError(Exception):
         self.gate_failed = gate_failed
 
 
+# When a train step OOMs, retry once with this smaller footprint (W9).
+_OOM_RETRY_FLAGS = ["--batch-size", "1", "--max-seq-len", "768"]
+
+
+def _is_oom(text: str) -> bool:
+    t = (text or "").lower()
+    return any(s in t for s in (
+        "out of memory", "cuda error: out of memory",
+        "outofmemoryerror", "torch.cuda.outofmemory",
+    ))
+
+
 def run_pipeline(
     pattern_id: str,
     *,
@@ -66,26 +78,46 @@ def run_pipeline(
     dataset_dir: str | Path | None = None,
     job: JobState | None = None,
     runner: Runner | None = None,
+    resume: bool = True,
 ) -> JobState:
     """Run dataset→train→sign→merge→baseline→validate→promote for ``pattern_id``.
 
     Returns the terminal :class:`JobState` (status passed/failed). Never raises
     for an expected failure (gate rejection or step error) — those land in the
     JobState and, for the validate gate, a Telegram failure message.
+
+    Resumable (W9): when ``job`` carries steps that already passed (a prior run
+    crashed partway), those steps are skipped so the expensive GPU work (train,
+    merge, baseline) isn't repeated. Pass ``resume=False`` to force a clean run.
     """
     cfg = cfg or Config()
     real_run = runner is None  # only touch the real GPU (placement) on real runs
     runner = runner or _default_runner
     job = job or JobState(job_id=jobs.new_job_id(pattern_id), pattern_id=pattern_id)
     logs_root = cfg.jobs_dir / job.job_id
+    done = {s.name for s in job.steps if s.status == jobs.STATUS_PASSED} if resume else set()
     job.save(cfg.jobs_dir)
 
-    def step(name: str, argv: list[str]) -> str:
+    def _execute(name: str, argv: list[str], log_name: str) -> tuple[int, str, str]:
         st = job.start_step(name)
         job.save(cfg.jobs_dir)
-        rc, out, err = runner(argv, logs_root / f"{name}.log")
+        rc, out, err = runner(argv, logs_root / log_name)
         job.finish_step(st, rc, detail=(err or out or "").strip()[-500:] or None)
         job.save(cfg.jobs_dir)
+        return rc, out, err
+
+    def step(name: str, argv: list[str], *, retry_argv: list[str] | None = None) -> str:
+        if name in done:
+            LOG.info("resume: skipping already-passed step",
+                     extra={"step": name, "job_id": job.job_id})
+            prev = next(s for s in reversed(job.steps)
+                        if s.name == name and s.status == jobs.STATUS_PASSED)
+            return prev.detail or ""
+        rc, out, err = _execute(name, argv, f"{name}.log")
+        if rc != 0 and retry_argv is not None and _is_oom(f"{err}\n{out}"):
+            LOG.warning("OOM detected; retrying with smaller footprint",
+                        extra={"step": name, "job_id": job.job_id, "retry_flags": _OOM_RETRY_FLAGS})
+            rc, out, err = _execute(name, retry_argv, f"{name}-retry.log")
         if rc != 0:
             raise PipelineError(f"{name} exited {rc}", gate_failed=(name == "validate"))
         return out
@@ -112,7 +144,7 @@ def run_pipeline(
                       "--max-steps", str(cfg.max_steps), "-v"]
         if cfg.train_profile:
             train_argv[1:1] = ["--profile", cfg.train_profile]
-        step("train", train_argv)
+        step("train", train_argv, retry_argv=train_argv + _OOM_RETRY_FLAGS)
 
         # 3. sign the training manifest  (venv-train)
         step("sign", [tool("train", "apprentice-sign"), "sign",
@@ -156,8 +188,11 @@ def run_pipeline(
     # Record cost outside the try/except so a ledger write failure doesn't
     # silently swallow the passed pipeline, and a passed pipeline isn't
     # downgraded to failed by a ledger I/O error.
-    _train_step = next((s for s in job.steps if s.name == "train"), None)
-    if _train_step and _train_step.started_at and _train_step.ended_at:
+    # Use the last *passed* train step (an OOM retry appends a second one).
+    _train_step = next((s for s in reversed(job.steps)
+                        if s.name == "train" and s.status == jobs.STATUS_PASSED
+                        and s.started_at and s.ended_at), None)
+    if _train_step:
         try:
             from . import cost as cost_mod
             cost_mod.record(cfg, pattern_id, job.job_id,

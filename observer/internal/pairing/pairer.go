@@ -178,6 +178,16 @@ func (p *Pairer) sessionEnrichment(ctx context.Context, sessionID string) (sql.N
 		return cached.model, cached.systemPromptHash, nil
 	}
 
+	// Source-agnostic (W2): non-Hermes sources (e.g. the openai-log adapter)
+	// have no sessions table to enrich from — just skip enrichment.
+	if p.hermes == nil {
+		meta := sessionMeta{loaded: true}
+		p.mu.Lock()
+		p.sessions[sessionID] = meta
+		p.mu.Unlock()
+		return meta.model, meta.systemPromptHash, nil
+	}
+
 	const q = `SELECT model, system_prompt FROM sessions WHERE id = ?`
 	var model, sysPrompt sql.NullString
 	err := p.hermes.QueryRowContext(ctx, q, sessionID).Scan(&model, &sysPrompt)

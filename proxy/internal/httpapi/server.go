@@ -71,6 +71,14 @@ type Config struct {
 	// route at 100%.
 	CanaryManager *canary.Manager
 
+	// Breaker is a per-pattern circuit breaker on the specialist path (W7).
+	// After BreakerThreshold consecutive failures (errors, bad responses, or
+	// failed output validation), matched requests skip the specialist and
+	// fall through to upstream for BreakerCooldown. Nil disables it.
+	Breaker          *CircuitBreaker
+	BreakerThreshold int           // ignored when Breaker is set
+	BreakerCooldown  time.Duration // ignored when Breaker is set
+
 	// ServeURL, when set, enables multi-LoRA routing: a matched request is
 	// routed by adapter name (the pattern id) to this single warm vLLM server
 	// instead of each pattern's specialist_url. ResidencyURL is the residency
@@ -161,6 +169,15 @@ func New(cfg Config) *Server {
 
 	stats := newStatsHandler(cfg.LatencyTracker)
 	mux.HandleFunc("GET /stats", stats.handleStats)
+
+	// Build the per-pattern circuit breaker if the caller didn't supply one.
+	if cfg.Breaker == nil && cfg.BreakerThreshold > 0 {
+		cd := cfg.BreakerCooldown
+		if cd <= 0 {
+			cd = 30 * time.Second
+		}
+		cfg.Breaker = NewCircuitBreaker(cfg.BreakerThreshold, cd)
+	}
 
 	ph := newProxyHandler(cfg)
 	mux.HandleFunc("POST /v1/chat/completions", ph.handleChatCompletions)

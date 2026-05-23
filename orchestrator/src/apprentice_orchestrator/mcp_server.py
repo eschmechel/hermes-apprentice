@@ -21,6 +21,7 @@ from pathlib import Path
 from . import budget as budget_mod, cost as cost_mod, jobs, quota as quota_mod, requests
 from .config import Config
 from .jobs import JobState
+from .venvs import tool
 
 LOG = logging.getLogger("apprentice_orchestrator.mcp")
 
@@ -170,6 +171,22 @@ def _build_server():
     def get_latency() -> dict:
         """Specialist vs upstream latency stats (count, avg, p50, p95, p99)."""
         return cost_mod.proxy_latency_stats(cfg)
+
+    @mcp.tool()
+    def demote(pattern_id: str, to_version: int = 0) -> dict:
+        """Instant rollback: repoint a specialist's `latest` to a previous
+        version (to_version=0 means the next-lower good version). The warm
+        server and proxy pick it up on the next request — no retraining."""
+        argv = [tool("serve", "apprentice-registry"), "demote", pattern_id]
+        if to_version:
+            argv += ["--to-version", str(to_version)]
+        proc = subprocess.run(argv, capture_output=True, text=True)
+        if proc.returncode != 0:
+            return {"error": (proc.stderr or proc.stdout).strip()[-300:] or "demote failed"}
+        try:
+            return json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            return {"pattern_id": pattern_id, "ok": True, "raw": proc.stdout.strip()}
 
     # ── tenant / quota / budget tools ──────────────────────────────────────
 

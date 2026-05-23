@@ -94,9 +94,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Override pattern description for the SKILL.md. Takes "
                         "precedence over <patterns-root>/<pattern-id>/manifest.json.")
     p.add_argument("--hermes-guest", default=skill_registrar.DEFAULT_GUEST_HOST,
-                   help=f"SSH target for Hermes microVM (default: "
-                        f"{skill_registrar.DEFAULT_GUEST_HOST}). Empty string skips "
-                        f"the guest push and only stages locally.")
+                   help=f"Guest target: ssh host for firecracker (default: "
+                        f"{skill_registrar.DEFAULT_GUEST_HOST}) or container name for "
+                        f"docker. Empty string skips the guest push and stages locally.")
+    p.add_argument("--guest-backend", default=None, choices=["firecracker", "docker"],
+                   help="Guest transport (default: $APPRENTICE_GUEST_BACKEND or firecracker).")
     p.add_argument("--hermes-guest-skills-dir",
                    default=skill_registrar.DEFAULT_GUEST_SKILLS_DIR,
                    help=f"Skills dir on the Hermes guest (default: "
@@ -225,6 +227,7 @@ def run_validate(args: argparse.Namespace) -> int:
                     ),
                     guest_host=(args.hermes_guest or None),
                     guest_skills_dir=args.hermes_guest_skills_dir,
+                    guest_backend=args.guest_backend,
                 )
                 result["skill_registration"] = reg_result.as_dict()
             except (ValueError, OSError) as e:

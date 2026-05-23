@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import glob as glob_mod
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
@@ -25,11 +26,32 @@ def _iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+# slog emits RFC3339 with fractional seconds and a numeric tz offset,
+# e.g. "2026-05-21T21:51:31.0123456-07:00" — strict %Y-%m-%dT%H:%M:%SZ
+# silently misses it. Accept any of: trailing Z, ±HH:MM, ±HHMM, or none.
+_ISO_RE = re.compile(
+    r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:\.(\d+))?(Z|[+-]\d{2}:?\d{2})?$"
+)
+
+
 def _parse_iso(ts: str | None) -> datetime | None:
     if not ts:
         return None
+    m = _ISO_RE.match(ts.strip())
+    if not m:
+        return None
+    date, clock, frac, zone = m.groups()
+    s = f"{date}T{clock}"
+    if frac:
+        s += "." + frac[:6]  # datetime.fromisoformat accepts at most microseconds
+    if not zone or zone == "Z":
+        s += "+00:00"
+    elif ":" not in zone:
+        s += zone[:3] + ":" + zone[3:]
+    else:
+        s += zone
     try:
-        return datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+        return datetime.fromisoformat(s).astimezone(timezone.utc)
     except ValueError:
         return None
 
@@ -182,10 +204,18 @@ def roi(cfg, pattern_id: str) -> dict:
 
 
 def all_patterns_roi(cfg) -> list[dict]:
-    """ROI for every pattern that has a ledger entry."""
+    """ROI for every pattern seen in the ledger *or* the proxy log.
+
+    Matches the Go dashboard's no-filter ROI: a pattern that has served
+    requests (savings) but has no training-cost ledger entry yet still shows up.
+    """
     ledger_path = cfg.cost_dir / "ledger.jsonl"
     entries = _read_ledger(ledger_path)
-    patterns = list({e["pattern_id"] for e in entries if "pattern_id" in e})
+    patterns = {e["pattern_id"] for e in entries if "pattern_id" in e}
+    for obj in _iter_specialist_entries(cfg):
+        pid = obj.get("pattern_id")
+        if pid:
+            patterns.add(pid)
     return [roi(cfg, pid) for pid in sorted(patterns)]
 
 
@@ -250,7 +280,8 @@ def proxy_latency_stats(cfg) -> dict:
                     route = obj.get("route_decision", "")
                     if route == "specialist":
                         specialist_lat.append(float(lat))
-                    elif route == "upstream":
+                    elif route in ("upstream", "fallback"):
+                        # match the Go dashboard: fallbacks are upstream traffic
                         upstream_lat.append(float(lat))
         except (OSError, IOError):
             continue

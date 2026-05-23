@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/fetcher"
 	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/quality"
 	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/redact"
+	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/secrets"
 	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/splitter"
 	"github.com/eschmechel/hermes-apprentice/dataset-builder/internal/versioned"
 	"github.com/spf13/cobra"
@@ -26,10 +28,12 @@ func buildCmd() *cobra.Command {
 		systemPrompt     string
 		systemPromptFile string
 		outputDir        string
+		teacher          string
 		model            string
 		apiKey           string
 		pruneKeep        int
 		pruneOlderThan   string
+		excludeSessions  []string
 	)
 
 	cmd := &cobra.Command{
@@ -41,6 +45,9 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 		RunE: func(c *cobra.Command, _ []string) error {
 			if patternID == "" {
 				return fmt.Errorf("--pattern-id is required")
+			}
+			if teacher != "off" && teacher != "cloud" {
+				return fmt.Errorf("--teacher must be 'off' or 'cloud', got %q", teacher)
 			}
 
 			// Resolve system prompt.
@@ -79,6 +86,29 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 				return fmt.Errorf("no records found for pattern %s", patternID)
 			}
 
+			// 1b. Right-to-be-forgotten: drop records from excluded sessions
+			// before any processing (W8 purge).
+			excludedCount := 0
+			if len(excludeSessions) > 0 {
+				drop := make(map[string]bool, len(excludeSessions))
+				for _, s := range excludeSessions {
+					drop[s] = true
+				}
+				kept := records[:0]
+				for _, rec := range records {
+					if drop[rec.SessionID] {
+						excludedCount++
+						continue
+					}
+					kept = append(kept, rec)
+				}
+				records = kept
+				logger.Info("excluded sessions (right-to-be-forgotten)", "dropped", excludedCount, "remaining", len(records))
+				if len(records) == 0 {
+					return fmt.Errorf("all records excluded for pattern %s", patternID)
+				}
+			}
+
 			// 2. PII redact.
 			if presidioURL != "" {
 				rc := redact.NewClient(presidioURL)
@@ -99,6 +129,23 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 				logger.Info("PII redacted", "count", len(records))
 			}
 
+			// 2b. Secrets scan (always on): catch API keys/tokens/private keys
+			// that Presidio's PII model misses, so they never reach the weights.
+			secretsFound := 0
+			for i := range records {
+				if red, n := secrets.Redact(records[i].InputText); n > 0 {
+					records[i].InputText = red
+					secretsFound += n
+				}
+				if red, n := secrets.Redact(records[i].OutputText); n > 0 {
+					records[i].OutputText = red
+					secretsFound += n
+				}
+			}
+			if secretsFound > 0 {
+				logger.Info("secrets redacted", "count", secretsFound)
+			}
+
 			// 3. Quality filter (drop re-asks).
 			records = quality.Filter(records)
 			logger.Info("quality filtered", "count", len(records))
@@ -107,12 +154,16 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 			records = dedup.Filter(records, dedup.Config{Threshold: 0.85})
 			logger.Info("deduped", "count", len(records))
 
-			// 5. Teacher augmentation for small datasets.
+			// 5. Teacher augmentation for small datasets. OFF by default — the
+			// teacher is a *cloud* model, so sending transcripts to it is an
+			// explicit, logged opt-in (--teacher cloud), never automatic from a
+			// stray OPENROUTER_API_KEY in the environment (W8 privacy default).
 			augmentedCount := 0
-			if apiKey != "" {
+			if teacher == "cloud" && apiKey != "" {
+				logger.Info("teacher augmentation enabled (cloud opt-in)", "model", model)
 				augCfg := augment.Config{
-					Model:   model,
-					APIKey:  apiKey,
+					Model:     model,
+					APIKey:    apiKey,
 					MinTarget: 200,
 				}
 				a, err := augment.New(augCfg)
@@ -157,6 +208,39 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 			}
 			logger.Info("dataset saved", "version", v, "dir", verDir)
 
+			// 7b. Data card: a human- and machine-readable provenance record of
+			// how this dataset was produced (W8 transparency/governance).
+			teacherModel := ""
+			if teacher == "cloud" {
+				teacherModel = model
+			}
+			card := map[string]any{
+				"pattern_id":        patternID,
+				"version":           v,
+				"built_at":          time.Now().UTC().Format(time.RFC3339),
+				"original_count":    originalCount,
+				"excluded_sessions": len(excludeSessions),
+				"excluded_records":  excludedCount,
+				"final_train":       trainN,
+				"final_val":         valN,
+				"final_test":        testN,
+				"augmented_count":   augmentedCount,
+				"pii_redaction":     presidioURL != "",
+				"presidio_url":      presidioURL,
+				"secrets_redaction": true,
+				"secrets_found":     secretsFound,
+				"teacher_mode":      teacher,
+				"teacher_model":     teacherModel,
+				"retention_keep":    pruneKeep,
+				"retention_max_age": pruneOlderThan,
+			}
+			cardPath := filepath.Join(verDir, "data_card.json")
+			if data, err := json.MarshalIndent(card, "", "  "); err == nil {
+				if err := os.WriteFile(cardPath, append(data, '\n'), 0o644); err != nil {
+					logger.Warn("data card write failed", "error", err)
+				}
+			}
+
 			// 8. Prune old versions.
 			patternDir := filepath.Join(outputDir, patternID)
 			if pruneKeep > 0 {
@@ -186,9 +270,11 @@ splits 80/10/10, and writes gzipped Hermes JSONL into a versioned output directo
 	cmd.Flags().StringVar(&systemPrompt, "system-prompt", "", "Override default Hermes system prompt")
 	cmd.Flags().StringVar(&systemPromptFile, "system-prompt-file", "", "Read system prompt from file")
 	cmd.Flags().StringVar(&outputDir, "output-dir", os.ExpandEnv("$HOME/.apprentice/datasets"), "Directory for versioned dataset output")
-	cmd.Flags().StringVar(&model, "model", "deepseek-v4-pro", "OpenRouter model for teacher augmentation")
+	cmd.Flags().StringVar(&model, "model", "deepseek-v4-pro", "OpenRouter model for teacher augmentation (only used with --teacher cloud)")
 	cmd.Flags().StringVar(&apiKey, "api-key", os.Getenv("OPENROUTER_API_KEY"), "OpenRouter API key (defaults to OPENROUTER_API_KEY env)")
+	cmd.Flags().StringVar(&teacher, "teacher", "off", "Teacher augmentation: 'off' (default, no data leaves the host) or 'cloud' (opt-in: send transcripts to the OpenRouter teacher)")
 	cmd.Flags().IntVar(&pruneKeep, "prune-keep", 3, "Keep last N versions; prune older ones")
 	cmd.Flags().StringVar(&pruneOlderThan, "prune-older-than", "", "Prune versions older than this duration (e.g. 720h, 30d)")
+	cmd.Flags().StringArrayVar(&excludeSessions, "exclude-session", nil, "Drop all records from this session id before building (right-to-be-forgotten; repeatable)")
 	return cmd
 }

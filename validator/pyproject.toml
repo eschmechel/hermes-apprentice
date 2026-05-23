@@ -16,6 +16,7 @@ dependencies = [
 [project.scripts]
 apprentice-baseline = "apprentice_validator.baseline_cli:main"
 apprentice-validate = "apprentice_validator.cli:main"
+apprentice-registry = "apprentice_validator.registry_cli:main"
 
 [build-system]
 requires = ["hatchling"]

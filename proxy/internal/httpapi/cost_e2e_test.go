@@ -527,3 +527,39 @@ func TestE2E_Registry_PicksHighestVersion(t *testing.T) {
 	}
 }
 
+func TestE2E_Registry_HonorsLatestSymlink(t *testing.T) {
+	// v1, v2, v3 exist but `latest` -> v1 (a demote). /latest must serve v1,
+	// not the highest version — otherwise rollback is a no-op.
+	tmp := t.TempDir()
+	registryRoot := filepath.Join(tmp, "registry")
+	patternID := "p3"
+	for _, v := range []int{1, 2, 3} {
+		versDir := filepath.Join(registryRoot, patternID, "v"+strconv.Itoa(v))
+		os.MkdirAll(versDir, 0o755)
+		manifest := `{"pattern_id":"` + patternID + `","version":` + strconv.Itoa(v) + `}`
+		os.WriteFile(filepath.Join(versDir, "registry_manifest.json"), []byte(manifest), 0o644)
+	}
+	if err := os.Symlink("v1", filepath.Join(registryRoot, patternID, "latest")); err != nil {
+		t.Fatal(err)
+	}
+
+	logger := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	mux := http.NewServeMux()
+	rh := newRegistryHandler(registryRoot, logger)
+	mux.HandleFunc("GET /api/registry/{pattern_id}/latest", rh.handleLatest)
+	ts := httptest.NewServer(mux)
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/api/registry/p3/latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	var result map[string]any
+	json.NewDecoder(resp.Body).Decode(&result)
+	if v := result["version"]; v == nil || int(v.(float64)) != 1 {
+		t.Errorf("expected demoted latest version 1, got %v", v)
+	}
+}
+

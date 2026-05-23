@@ -76,6 +76,19 @@ func (h *RegistryHandler) handleLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func findLatest(skillDir string) (int, error) {
+	// Honor the `latest` symlink (W10 demote repoints it) before falling back
+	// to the highest v<N> on disk.
+	if target, err := os.Readlink(filepath.Join(skillDir, "latest")); err == nil {
+		name := filepath.Base(target)
+		if strings.HasPrefix(name, "v") {
+			if v, e := strconv.Atoi(name[1:]); e == nil && v > 0 {
+				if fi, e2 := os.Stat(filepath.Join(skillDir, name)); e2 == nil && fi.IsDir() {
+					return v, nil
+				}
+			}
+		}
+	}
+
 	entries, err := os.ReadDir(skillDir)
 	if err != nil {
 		if os.IsNotExist(err) {
