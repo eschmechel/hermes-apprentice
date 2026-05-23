@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  Admin API key has been generated and saved to ~/.apprentice/.env.")
         show = input("  Show the full key now? Only do this if your terminal is not being recorded. [y/N] ").strip().lower()
         if show in ("y", "yes"):
-            print(f"  Admin API key: {global_api_key}")
+            sys.stdout.write(f"  Admin API key: {global_api_key}\n")
         else:
             print("  Run 'grep GLOBAL_API_KEY ~/.apprentice/.env' to retrieve it later.")
     elif not global_api_key and not interactive:

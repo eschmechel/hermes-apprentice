@@ -56,7 +56,8 @@ def decide(cfg: Config) -> str:
         decision = can_burst(cfg, tenant, cfg.burst_gpu)
         if decision["allowed"]:
             return "cloud"
-        LOG.warning("cloud placement requested but burst blocked: %s", decision["reasons"])
+        LOG.warning("cloud placement requested but burst blocked (%d reason(s))",
+                    len(decision.get("reasons", [])))
     return "local"
 
 

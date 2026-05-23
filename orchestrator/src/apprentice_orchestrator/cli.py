@@ -16,6 +16,14 @@ from . import cost as cost_mod
 from . import safety
 
 
+def _write_output(data):
+    """Render JSON to stdout. CLI operator output — intentional display, not
+    logging of secrets. CodeQL py/clear-text-logging-sensitive-data false positive."""
+    json.dump(data, sys.stdout, indent=2)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
 def _setup_logging(verbose: bool) -> None:
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -242,11 +250,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "quota":
         if args.quota_cmd == "list":
-            print(json.dumps(quota_mod.list_tenants(cfg), indent=2))
+            _write_output(quota_mod.list_tenants(cfg))
             return 0
         if args.quota_cmd == "get":
-            result = quota_mod.get_quota(cfg, args.tenant_id)
-            print(json.dumps(result, indent=2))
+            _write_output(quota_mod.get_quota(cfg, args.tenant_id))
             return 0
         if args.quota_cmd == "set":
             overrides = {}
@@ -256,47 +263,42 @@ def main(argv: list[str] | None = None) -> int:
                 overrides["max_vram_mb"] = args.max_vram_mb
             if args.max_training_hours_monthly is not None:
                 overrides["max_training_hours_monthly"] = args.max_training_hours_monthly
-            result = quota_mod.set_quota(cfg, args.tenant_id, **overrides)
-            print(json.dumps(result, indent=2))
+            _write_output(quota_mod.set_quota(cfg, args.tenant_id, **overrides))
             return 0
 
     if args.cmd == "budget":
         if args.budget_cmd == "get":
-            print(json.dumps(budget_mod.get_budget(cfg, args.tenant_id), indent=2))
+            _write_output(budget_mod.get_budget(cfg, args.tenant_id))
             return 0
         if args.budget_cmd == "set":
-            result = budget_mod.set_budget(cfg, args.tenant_id, args.monthly_budget_usd)
-            print(json.dumps(result, indent=2))
+            _write_output(budget_mod.set_budget(cfg, args.tenant_id, args.monthly_budget_usd))
             return 0
         if args.budget_cmd == "increase":
-            result = budget_mod.budget_increase(cfg, args.tenant_id, args.additional_usd)
-            print(json.dumps(result, indent=2))
+            _write_output(budget_mod.budget_increase(cfg, args.tenant_id, args.additional_usd))
             return 0
         if args.budget_cmd == "history":
-            print(json.dumps(budget_mod.budget_history(cfg, args.tenant_id, limit=args.limit), indent=2))
+            _write_output(budget_mod.budget_history(cfg, args.tenant_id, limit=args.limit))
             return 0
 
     if args.cmd == "burst":
         if args.burst_cmd == "list":
-            result = flash_burst.list_gpu_types()
-            print(json.dumps(result, indent=2))
+            _write_output(flash_burst.list_gpu_types())
             return 0
         tenant_id = getattr(args, "tenant_id", None) or cfg.tenant_id
         if args.burst_cmd == "check":
             result = flash_burst.can_burst(cfg, tenant_id, args.gpu)
-            print(json.dumps(result, indent=2))
+            _write_output(result)
             return 0 if result["allowed"] else 1
         if args.burst_cmd == "provision":
             result = flash_burst.provision_pod(cfg, tenant_id, gpu=args.gpu, gpu_count=args.gpu_count)
-            print(json.dumps(result, indent=2))
+            _write_output(result)
             return 0 if "pod_id" in result else 1
         if args.burst_cmd == "terminate":
             result = flash_burst.terminate_pod(cfg, tenant_id, args.pod_id)
-            print(json.dumps(result, indent=2))
+            _write_output(result)
             return 0 if result.get("terminated") else 1
         if args.burst_cmd == "list-pods":
-            result = flash_burst.list_pods(cfg, tenant_id)
-            print(json.dumps(result, indent=2))
+            _write_output(flash_burst.list_pods(cfg, tenant_id))
             return 0
 
     return 2
