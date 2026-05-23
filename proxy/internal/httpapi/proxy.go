@@ -37,6 +37,7 @@ type proxyHandler struct {
 	pricing        CostEstimator
 	metrics        *Metrics
 	rateLimiter    *ratelimit.Limiter
+	breaker        *CircuitBreaker
 
 	rand func() float64
 }
@@ -58,6 +59,7 @@ func newProxyHandler(cfg Config) *proxyHandler {
 		pricing:        cfg.Pricing,
 		metrics:        cfg.Metrics,
 		rateLimiter:    cfg.RateLimiter,
+		breaker:        cfg.Breaker,
 		rand:           rand.Float64,
 	}
 }
@@ -133,6 +135,15 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 		}
 	}
 
+	// Circuit breaker (W7): if this specialist has been failing, skip it and
+	// let the request fall through to upstream until cooldown elapses. Sits
+	// before the canary check so a broken canary still trips the breaker.
+	if !h.breaker.Allow(patternID) {
+		h.logger.Warn("circuit breaker open; routing to upstream",
+			"pattern_id", patternID)
+		return false, "specialist_breaker_open"
+	}
+
 	// Check canary decision for this pattern.
 	canaryRoute, canaryManaged := false, false
 	if h.canaryManager != nil {
@@ -184,6 +195,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 			"specialist_url", match.Pattern.SpecialistURL,
 			"err", err,
 		)
+		h.breaker.RecordFailure(patternID)
 		if shadow != nil {
 			shadow.discard()
 		}
@@ -195,6 +207,7 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 	if readErr != nil {
 		h.logger.Warn("specialist body read failed; falling back to upstream",
 			"pattern_id", patternID, "err", readErr)
+		h.breaker.RecordFailure(patternID)
 		if shadow != nil {
 			shadow.discard()
 		}
@@ -206,11 +219,26 @@ func (h *proxyHandler) tryRouteToSpecialist(w http.ResponseWriter, r *http.Reque
 			"pattern_id", patternID,
 			"status", resp.StatusCode,
 		)
+		h.breaker.RecordFailure(patternID)
 		if shadow != nil {
 			shadow.discard()
 		}
 		return false, "specialist_bad_response"
 	}
+
+	// Output guard (W7): reject empty / malformed completions so a quietly
+	// broken specialist degrades to upstream, not to the user.
+	if reason := validateSpecialistOutput(body, specBody); reason != "" {
+		h.logger.Warn("specialist output failed validation; falling back to upstream",
+			"pattern_id", patternID, "reason", reason)
+		h.breaker.RecordFailure(patternID)
+		if shadow != nil {
+			shadow.discard()
+		}
+		return false, "specialist_invalid_output"
+	}
+
+	h.breaker.RecordSuccess(patternID)
 
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
