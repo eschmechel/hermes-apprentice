@@ -21,7 +21,7 @@ jobs:
       - run: pip install -e telegram -e trainer -e validator -e orchestrator pytest-cov mcp
       - run: |
           for pkg in orchestrator trainer validator; do
-            cd "$pkg" && python -m pytest tests/ -q --cov --cov-report=xml
+            (cd "$pkg" && python -m pytest tests/ -q --cov --cov-report=xml)
           done
 
       - name: Report coverage
