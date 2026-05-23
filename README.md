@@ -1,13 +1,14 @@
-# Apprentice — a Hermes Agent that trains its own specialists (v0.2)
+# Apprentice — specialist training infrastructure for agent teams (v0.2)
 
 Hermes Agent has skills — Markdown files that tell it how to handle a request.
-**Apprentice** adds a second loop: when Hermes has seen a pattern enough times,
-Apprentice grabs the `(user-input, big-model-output)` pairs, fine-tunes a
-little Qwen2.5-1.5B on them with Unsloth QLoRA, validates the result against a
-held-out test set, and registers it as a skill that routes future matches to a
-free local endpoint.
+**Apprentice** adds a second loop: when an agent (or several) has seen a pattern
+enough times, Apprentice grabs the `(user-input, big-model-output)` pairs, fine-tunes
+a little Qwen2.5-1.5B on them with Unsloth QLoRA, validates the result against a
+held-out test set, and registers it as a specialist that routes future matches to a
+free local endpoint — for every agent in the team.
 
 Skills are prompts. **Apprentice turns some of them into weights.**
+**One specialist, shared by every agent that needs it.**
 
 [![Hermes Agent Challenge](https://img.shields.io/badge/contest-Hermes%20Agent%20Challenge-ff69b4)](https://dev.to/challenges/hermes-agent-2026-05-15)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -73,7 +74,7 @@ flowchart LR
     P -- upstream fallback --> OR[(OpenRouter<br/>+ multi-provider)]
     TG_BOT -.via Hermes cron.-> User[Telegram channel]
     User -.replies.-> TG_BOT
-    VAL --> SKILL[/.hermes/skills/&lt;id&gt;/SKILL.md]
+    VAL --> SKILL[/.hermes/skills/{id}/SKILL.md]
     SKILL -.next session.-> H
 
     classDef done fill:#1f9d55,stroke:#0d6e3a,color:#fff;
