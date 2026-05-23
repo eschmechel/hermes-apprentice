@@ -118,7 +118,14 @@ def main(argv: list[str] | None = None) -> int:
     if not global_api_key and interactive:
         import secrets
         global_api_key = secrets.token_hex(16)
-        print(f"  Generated admin API key: {global_api_key}")
+        print("  Admin API key has been generated and saved to ~/.apprentice/.env.")
+        show = input("  Show the full key now? Only do this if your terminal is not being recorded. [y/N] ").strip().lower()
+        if show in ("y", "yes"):
+            print(f"  Admin API key: {global_api_key}")
+        else:
+            print("  Run 'grep GLOBAL_API_KEY ~/.apprentice/.env' to retrieve it later.")
+    elif not global_api_key and not interactive:
+        print("  No admin API key provided. Pass --global-api-key to generate one.")
 
     updates = {
         "APPRENTICE_GUEST_BACKEND": profile,
