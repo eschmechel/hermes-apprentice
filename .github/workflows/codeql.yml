@@ -6,6 +6,10 @@ on:
   schedule:
     - cron: '30 1 * * 0'
 
+permissions:
+  security-events: write
+  contents: read
+
 jobs:
   analyze-go:
     runs-on: ubuntu-latest
