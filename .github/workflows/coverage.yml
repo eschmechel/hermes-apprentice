@@ -18,7 +18,7 @@ jobs:
           python-version: '3.12'
 
       - run: make coverage-go
-      - run: pip install -e orchestrator -e trainer -e validator pytest-cov
+      - run: pip install -e orchestrator -e trainer -e validator pytest-cov mcp
       - run: |
           for pkg in orchestrator trainer validator; do
             cd "$pkg" && python -m pytest tests/ -q --cov --cov-report=xml

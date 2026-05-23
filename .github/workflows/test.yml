@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: |
-          pip install -e telegram -e trainer -e validator -e orchestrator -e serving pytest pytest-cov
+          pip install -e telegram -e trainer -e validator -e orchestrator -e serving pytest pytest-cov mcp
       - run: pytest tests/ -v --cov --cov-report=xml
         working-directory: ${{ matrix.pkg }}
       - uses: actions/upload-artifact@v4
