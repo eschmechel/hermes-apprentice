@@ -41,7 +41,13 @@ class Config:
     monthly_budget_usd: float = field(default_factory=lambda: float(
         _env("APPRENTICE_MONTHLY_BUDGET_USD", "20.0")))
     burst_gpu: str = field(default_factory=lambda: _env("APPRENTICE_BURST_GPU", "A100"))
-    tenant_id: str | None = field(default_factory=lambda: _env("APPRENTICE_TENANT_ID"))
+    # Multi-tenant seam (W11). When set, all of this orchestrator's state +
+    # artifacts live under ``<root>/tenants/<tenant_id>/`` so several tenants
+    # share one host (and one warm base) without colliding. None/empty ==
+    # single-tenant (the default layout, unchanged). Full authz/quotas/isolation
+    # are v0.2.  APPRENTICE_TENANT is accepted as an alias of APPRENTICE_TENANT_ID
+    # for parity with the W11 prototype.
+    tenant_id: str | None = field(default_factory=lambda: _env("APPRENTICE_TENANT_ID") or _env("APPRENTICE_TENANT"))
 
     # Placement policy (VRAM arbiter). Autonomous runs use these without
     # blocking; interactive surfaces may override per-run (stretch).
@@ -51,18 +57,24 @@ class Config:
     # "evict" (stop the warm serve to free VRAM) | "cloud" (burst, stretch) | "skip".
     on_vram_conflict: str = field(default_factory=lambda: _env("APPRENTICE_ON_VRAM_CONFLICT", "evict"))
 
+    @property
+    def base(self) -> Path:
+        """Tenant-namespaced root for this orchestrator's state + artifacts (W11).
+        Equal to ``self.root`` when no tenant is set (single-tenant layout)."""
+        return self.root / "tenants" / self.tenant_id if self.tenant_id else self.root
+
     # ---- per-pattern paths -------------------------------------------------
     def datasets_dir(self, pattern_id: str) -> Path:
-        return self.root / "datasets" / pattern_id
+        return self.base / "datasets" / pattern_id
 
     def checkpoints_dir(self, pattern_id: str, version: str) -> Path:
-        return self.root / "checkpoints" / pattern_id / version
+        return self.base / "checkpoints" / pattern_id / version
 
     def merged_dir(self, pattern_id: str, version: str) -> Path:
-        return self.root / "merged" / pattern_id / version
+        return self.base / "merged" / pattern_id / version
 
     def baseline_path(self, pattern_id: str, version: str) -> Path:
-        return self.root / "baselines" / f"{pattern_id}-{version}.jsonl"
+        return self.base / "baselines" / f"{pattern_id}-{version}.jsonl"
 
     # ---- cost / ROI --------------------------------------------------------
     gpu_hourly_usd: float = field(default_factory=lambda: float(
@@ -72,39 +84,48 @@ class Config:
 
     @property
     def cost_dir(self) -> Path:
-        return self.root / "cost"
+        return self.base / "cost"
 
     def _resolve_proxy_log_glob(self) -> str:
         if self.proxy_log_glob:
             return self.proxy_log_glob
+        # The proxy is a single shared process across tenants (it logs everyone's
+        # traffic, keyed by tenant-namespaced pattern_id) — its log stays at root.
         return str(self.root / "proxy" / "proxy.log")
 
     # ---- queues / state ----------------------------------------------------
     @property
     def decisions_dir(self) -> Path:
-        return self.root / "decisions"
+        return self.base / "decisions"
 
     @property
     def outbox_dir(self) -> Path:
-        return self.root / "outbox"
+        return self.base / "outbox"
 
     @property
     def jobs_dir(self) -> Path:
-        return self.root / "jobs"
+        return self.base / "jobs"
 
     @property
     def job_requests_dir(self) -> Path:
         # Durable queue MCP dispatch writes and the watcher drains (decoupled
         # from the MCP process lifecycle).
-        return self.root / "jobs" / "requests"
+        return self.base / "jobs" / "requests"
 
     @property
     def candidates_dir(self) -> Path:
-        return self.root / "candidates"
+        return self.base / "candidates"
 
     @property
     def patterns_dir(self) -> Path:
-        return self.root / "patterns"
+        return self.base / "patterns"
+
+
+def namespaced_pattern_id(tenant: str | None, pattern_id: str) -> str:
+    """Adapter-name isolation on the shared warm base (W11): a tenant's specialist
+    is addressed as ``<tenant>--<pattern>`` so the proxy/serving layer keeps
+    tenants' LoRA adapters distinct by name. Single-tenant returns the id as-is."""
+    return f"{tenant}--{pattern_id}" if tenant else pattern_id
 
 
 def _resolve_base_model() -> str:
