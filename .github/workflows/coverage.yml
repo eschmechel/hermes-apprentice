@@ -24,7 +24,7 @@ jobs:
             cd "$pkg" && python -m pytest tests/ -q --cov --cov-report=xml
           done
 
-      - name: Check coverage threshold
+      - name: Report coverage
         run: |
           echo "Go coverage:"
           for f in /tmp/cov-*.out; do
@@ -33,11 +33,5 @@ jobs:
           echo "Python coverage:"
           for pkg in orchestrator trainer validator; do
             echo "--- $pkg ---"
-            python -c "
-import xml.etree.ElementTree as ET
-tree = ET.parse('$pkg/coverage.xml')
-rate = tree.getroot().attrib['line-rate']
-pct = float(rate) * 100
-print(f'{pkg}: {pct:.1f}%')
-"
+            grep 'line-rate' "$pkg/coverage.xml" | head -1
           done
