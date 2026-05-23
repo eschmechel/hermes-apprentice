@@ -299,6 +299,52 @@ def push_to_guest(
     )
 
 
+def default_backend() -> str:
+    """Guest transport backend (W4): 'firecracker' (ssh/scp) or 'docker'
+    (docker exec/cp). Set by the installer in ~/.apprentice/.env."""
+    b = (os.environ.get("APPRENTICE_GUEST_BACKEND") or "firecracker").strip().lower()
+    return b if b in ("firecracker", "docker") else "firecracker"
+
+
+def push_to_guest_docker(
+    staged_skill_md: Path,
+    *,
+    pattern_id: str,
+    guest_host: str = "hermes",   # container name for the docker profile
+    guest_skills_dir: str = DEFAULT_GUEST_SKILLS_DIR,
+    docker_bin: str | None = None,
+    timeout: float = 10.0,
+) -> GuestPushResult:
+    """Docker-profile twin of :func:`push_to_guest`: ``docker exec mkdir`` then
+    ``docker cp`` into the Hermes container. Same best-effort contract. The
+    container name is taken from ``guest_host`` so the transport seam is uniform.
+    """
+    name = _normalize_pattern_id(pattern_id)
+    remote_dir = f"{guest_skills_dir.rstrip('/')}/{name}"
+    docker = docker_bin or shutil.which("docker") or "docker"
+    mkdir_cmd = [docker, "exec", guest_host, "mkdir", "-p", remote_dir]
+    cp_cmd = [docker, "cp", str(staged_skill_md), f"{guest_host}:{remote_dir}/SKILL.md"]
+    try:
+        subprocess.run(mkdir_cmd, check=True, timeout=timeout, capture_output=True, text=True)
+        subprocess.run(cp_cmd, check=True, timeout=timeout, capture_output=True, text=True)
+    except FileNotFoundError as e:
+        return GuestPushResult(attempted=True, succeeded=False,
+                               error=f"docker binary not found: {e}", command=cp_cmd)
+    except subprocess.TimeoutExpired as e:
+        return GuestPushResult(attempted=True, succeeded=False,
+                               error=f"timeout after {timeout}s: {e.cmd}", command=cp_cmd)
+    except subprocess.CalledProcessError as e:
+        return GuestPushResult(attempted=True, succeeded=False,
+                               error=f"{e.cmd[0]} exited {e.returncode}: {(e.stderr or '').strip()}",
+                               command=cp_cmd)
+    return GuestPushResult(attempted=True, succeeded=True, error=None, command=cp_cmd)
+
+
+def guest_pusher(backend: str | None = None):
+    """Return the push function for the active guest backend (W4 seam)."""
+    return push_to_guest_docker if (backend or default_backend()) == "docker" else push_to_guest
+
+
 @dataclass
 class RegistrationResult:
     pattern_id: str
@@ -322,6 +368,7 @@ def register_skill(
     guest_host: str | None = DEFAULT_GUEST_HOST,
     guest_skills_dir: str = DEFAULT_GUEST_SKILLS_DIR,
     push_to_guest_fn=push_to_guest,
+    guest_backend: str | None = None,
 ) -> RegistrationResult:
     """Render → stage → (optionally) push the per-pattern SKILL.md.
 
@@ -353,9 +400,14 @@ def register_skill(
     skill_md = render_skill_md(pattern_id, desc, record_count=effective_count)
     staged = stage_skill(pattern_id, skill_md, staging_root)
 
+    # Transport seam (W4): an explicitly injected push fn wins (tests); otherwise
+    # the active backend (firecracker ssh/scp | docker exec/cp) decides.
+    backend = guest_backend or default_backend()
+    pusher = push_to_guest_fn if push_to_guest_fn is not push_to_guest else guest_pusher(backend)
+
     guest_payload: dict[str, Any] = {"skipped": True}
     if guest_host:
-        result = push_to_guest_fn(
+        result = pusher(
             staged,
             pattern_id=pattern_id,
             guest_host=guest_host,
@@ -368,6 +420,7 @@ def register_skill(
             "error": result.error,
             "host": guest_host,
             "remote_dir": f"{guest_skills_dir.rstrip('/')}/{_normalize_pattern_id(pattern_id)}",
+            "backend": backend,
         }
         if result.succeeded:
             LOG.info("skill pushed to hermes guest", extra=guest_payload)

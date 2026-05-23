@@ -270,3 +270,59 @@ def test_push_to_guest_constructs_expected_commands(tmp_path: Path, monkeypatch)
     assert calls[1][0] == "scp"
     assert calls[1][-2] == str(staged)
     assert calls[1][-1] == f"root@10.0.2.2:/root/.hermes/skills/{PATTERN_ID}/SKILL.md"
+
+
+# ── W4: docker transport seam ────────────────────────────────────────────────
+
+def test_default_backend_from_env(monkeypatch):
+    monkeypatch.delenv("APPRENTICE_GUEST_BACKEND", raising=False)
+    assert skill_registrar.default_backend() == "firecracker"
+    monkeypatch.setenv("APPRENTICE_GUEST_BACKEND", "docker")
+    assert skill_registrar.default_backend() == "docker"
+    monkeypatch.setenv("APPRENTICE_GUEST_BACKEND", "bogus")
+    assert skill_registrar.default_backend() == "firecracker"  # invalid -> default
+
+
+def test_guest_pusher_selects_backend(monkeypatch):
+    assert skill_registrar.guest_pusher("docker") is skill_registrar.push_to_guest_docker
+    assert skill_registrar.guest_pusher("firecracker") is skill_registrar.push_to_guest
+
+
+def test_push_to_guest_docker_constructs_exec_and_cp(tmp_path, monkeypatch):
+    calls: list[list[str]] = []
+
+    class _CP:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr(skill_registrar.subprocess, "run",
+                        lambda cmd, **_k: (calls.append(list(cmd)), _CP())[1])
+    staged = tmp_path / "SKILL.md"
+    staged.write_text("---\nname: x\ndescription: y\n---\nbody\n")
+
+    res = skill_registrar.push_to_guest_docker(
+        staged, pattern_id=PATTERN_ID, guest_host="hermes",
+        guest_skills_dir="/root/.hermes/skills", docker_bin="docker", timeout=5.0,
+    )
+    assert res.succeeded is True and len(calls) == 2
+    # docker exec hermes mkdir -p /root/.hermes/skills/<id>
+    assert calls[0][:3] == ["docker", "exec", "hermes"]
+    assert calls[0][-3:] == ["mkdir", "-p", f"/root/.hermes/skills/{PATTERN_ID}"]
+    # docker cp <staged> hermes:/root/.hermes/skills/<id>/SKILL.md
+    assert calls[1][:2] == ["docker", "cp"]
+    assert calls[1][-1] == f"hermes:/root/.hermes/skills/{PATTERN_ID}/SKILL.md"
+
+
+def test_register_skill_docker_backend_routes_to_docker_pusher(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPRENTICE_GUEST_BACKEND", "docker")
+    seen = {}
+    monkeypatch.setattr(skill_registrar.subprocess, "run",
+                        lambda cmd, **_k: seen.setdefault("first_argv", list(cmd)) and None
+                        or type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})())
+    res = skill_registrar.register_skill(
+        PATTERN_ID, description="d", staging_root=tmp_path, patterns_root=tmp_path,
+        guest_host="hermes",
+    )
+    assert res.guest_push["backend"] == "docker"
+    assert seen["first_argv"][0].endswith("docker") and seen["first_argv"][1] == "exec"
