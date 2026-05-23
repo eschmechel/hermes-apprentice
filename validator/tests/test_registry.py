@@ -131,3 +131,60 @@ def test_promote_raises_missing_model():
             model_dir=Path("/nonexistent/path"),
             scores={},
         )
+
+
+# ── W10: latest pointer + demote + gc ────────────────────────────────────────
+
+def test_promote_sets_latest_pointer(tmp_path: Path, fake_model_dir: Path, key_dir: Path):
+    reg_root = tmp_path / "reg"
+    for _ in range(2):
+        registry.promote(pattern_id="ptr", model_dir=fake_model_dir,
+                         scores={"f1": 0.9}, registry_root=reg_root, key_dir=key_dir)
+    skill_dir = reg_root / "ptr"
+    latest = skill_dir / "latest"
+    assert latest.is_symlink()
+    assert (latest / "registry_manifest.json").exists()  # resolves through the link
+    assert registry.current_version(skill_dir) == 2
+
+
+def test_find_latest_version_ignores_latest_symlink(tmp_path: Path, fake_model_dir: Path, key_dir: Path):
+    reg_root = tmp_path / "reg"
+    registry.promote(pattern_id="s", model_dir=fake_model_dir, scores={},
+                     registry_root=reg_root, key_dir=key_dir)
+    # 'latest' is a symlink, not a v<N> dir — must not be miscounted.
+    assert registry.find_latest_version(reg_root / "s") == 1
+    assert registry.list_versions(reg_root / "s") == [1]
+
+
+def test_demote_repoints_latest(tmp_path: Path, fake_model_dir: Path, key_dir: Path):
+    reg_root = tmp_path / "reg"
+    for _ in range(3):
+        registry.promote(pattern_id="d", model_dir=fake_model_dir, scores={},
+                         registry_root=reg_root, key_dir=key_dir)
+    skill_dir = reg_root / "d"
+    assert registry.current_version(skill_dir) == 3
+    now = registry.demote(pattern_id="d", registry_root=reg_root)
+    assert now == 2 and registry.current_version(skill_dir) == 2
+    now = registry.demote(pattern_id="d", to_version=1, registry_root=reg_root)
+    assert now == 1 and registry.current_version(skill_dir) == 1
+
+
+def test_demote_nothing_below_raises(tmp_path: Path, fake_model_dir: Path, key_dir: Path):
+    reg_root = tmp_path / "reg"
+    registry.promote(pattern_id="only", model_dir=fake_model_dir, scores={},
+                     registry_root=reg_root, key_dir=key_dir)
+    with pytest.raises(ValueError):
+        registry.demote(pattern_id="only", registry_root=reg_root)
+
+
+def test_gc_keeps_newest_and_latest(tmp_path: Path, fake_model_dir: Path, key_dir: Path):
+    reg_root = tmp_path / "reg"
+    for _ in range(5):
+        registry.promote(pattern_id="g", model_dir=fake_model_dir, scores={},
+                         registry_root=reg_root, key_dir=key_dir)
+    # roll latest back to v2, then GC keeping 2 newest -> keep {v4,v5} + latest v2
+    registry.demote(pattern_id="g", to_version=2, registry_root=reg_root)
+    pruned = registry.garbage_collect(pattern_id="g", keep=2, registry_root=reg_root)
+    assert set(pruned) == {1, 3}
+    assert registry.list_versions(reg_root / "g") == [2, 4, 5]
+    assert registry.current_version(reg_root / "g") == 2  # latest untouched

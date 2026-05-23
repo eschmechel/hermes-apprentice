@@ -28,13 +28,12 @@ func (rh *registryHandler) handleLatest(w http.ResponseWriter, r *http.Request) 
 	patternID := r.PathValue("pattern_id")
 	skillDir := filepath.Join(rh.registryRoot, patternID)
 
-	vers := findVersionDirs(skillDir)
-	if len(vers) == 0 {
+	latest := resolveLatest(skillDir)
+	if latest == "" {
 		writeError(w, http.StatusNotFound, "no promoted versions for pattern '"+patternID+"'")
 		return
 	}
 
-	latest := vers[len(vers)-1]
 	manifestPath := filepath.Join(skillDir, latest, "registry_manifest.json")
 	data, err := os.ReadFile(manifestPath)
 	if err != nil {
@@ -51,6 +50,27 @@ func (rh *registryHandler) handleLatest(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, result)
+}
+
+// resolveLatest returns the version directory name the registry considers
+// current: the `latest` symlink's target if present (W10 demote repoints it),
+// otherwise the highest v<N>. Empty string when the skill has no versions.
+func resolveLatest(skillDir string) string {
+	if target, err := os.Readlink(filepath.Join(skillDir, "latest")); err == nil {
+		name := filepath.Base(target)
+		if len(name) > 1 && name[0] == 'v' {
+			if _, e := strconv.Atoi(name[1:]); e == nil {
+				if fi, e2 := os.Stat(filepath.Join(skillDir, name)); e2 == nil && fi.IsDir() {
+					return name
+				}
+			}
+		}
+	}
+	vers := findVersionDirs(skillDir)
+	if len(vers) == 0 {
+		return ""
+	}
+	return vers[len(vers)-1]
 }
 
 // findVersionDirs returns sorted ascending v<N> directory names under skillDir.
