@@ -18,12 +18,18 @@ from __future__ import annotations
 
 import logging
 import subprocess
+import time
 
 from .config import Config
 
 LOG = logging.getLogger("apprentice_orchestrator.placement")
 
 _SERVE_PATTERNS = ("apprentice-serve-control", "apprentice-serve", "vllm serve")
+
+# How long to wait for the warm serve to actually release VRAM after pkill
+# (pkill is async; vLLM takes a few seconds to tear down CUDA context).
+_EVICT_TIMEOUT_S = 30.0
+_EVICT_POLL_S = 1.0
 
 
 def free_vram_mb() -> int | None:
@@ -46,6 +52,24 @@ def free_vram_mb() -> int | None:
 def _stop_warm_serve() -> None:
     for pat in _SERVE_PATTERNS:
         subprocess.run(["pkill", "-f", pat], capture_output=True)
+
+
+def _wait_for_vram(need_mb: int, *, timeout: float | None = None,
+                   poll: float | None = None) -> int | None:
+    """Block until free VRAM >= need_mb (or timeout). Returns the last reading.
+
+    pkill returns before vLLM has released its CUDA context, so a train launched
+    immediately after eviction can still OOM. Poll until the GPU is actually free.
+    Timeout/poll resolve from module constants at call time (monkeypatchable).
+    """
+    timeout = _EVICT_TIMEOUT_S if timeout is None else timeout
+    poll = _EVICT_POLL_S if poll is None else poll
+    deadline = time.monotonic() + timeout
+    free = free_vram_mb()
+    while free is not None and free < need_mb and time.monotonic() < deadline:
+        time.sleep(poll)
+        free = free_vram_mb()
+    return free
 
 
 def decide(cfg: Config) -> str:
@@ -74,7 +98,11 @@ def prepare_local_gpu(cfg: Config) -> dict:
                                                             "policy": cfg.on_vram_conflict})
     if cfg.on_vram_conflict == "evict":
         _stop_warm_serve()
-        return {"placement": "local", "free_mb": free, "need_mb": need,
+        freed = _wait_for_vram(need)
+        if freed is not None and freed < need:
+            LOG.warning("evicted warm serve but VRAM still below need; training may OOM",
+                        extra={"free_mb": freed, "need_mb": need})
+        return {"placement": "local", "free_mb": freed, "need_mb": need,
                 "evicted": True, "reason": "vram_conflict"}
     return {"placement": "local", "free_mb": free, "need_mb": need,
             "evicted": False, "reason": "vram_conflict_unhandled"}

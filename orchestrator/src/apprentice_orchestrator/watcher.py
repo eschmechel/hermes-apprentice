@@ -58,10 +58,14 @@ def tick(cfg: Config | None = None, *, runner: Runner | None = None, max_jobs: i
                 _ack(cfg, marker)
                 continue
             LOG.info("training approved", extra={"pattern_id": pattern_id, "cid": cid})
-            job = run_pipeline(pattern_id, cfg=cfg, runner=runner)
             jobs_run += 1
-            summary["trained"].append({"pattern_id": pattern_id, "job_id": job.job_id, "status": job.status})
-            _ack(cfg, marker)
+            try:
+                job = run_pipeline(pattern_id, cfg=cfg, runner=runner)
+                summary["trained"].append({"pattern_id": pattern_id, "job_id": job.job_id, "status": job.status})
+            except Exception as e:  # never let one bad marker wedge the loop
+                LOG.exception("pipeline crashed", extra={"pattern_id": pattern_id, "marker": marker.name})
+                summary["errors"].append({"marker": marker.name, "pattern_id": pattern_id, "error": str(e)})
+            _ack(cfg, marker)  # ack regardless: a crashed marker must not re-run forever
 
         elif action == "skip":
             _set_pattern_status(cfg, cid, "rejected")
@@ -96,9 +100,13 @@ def tick(cfg: Config | None = None, *, runner: Runner | None = None, max_jobs: i
             continue
         existing = jobs.load_job(cfg.jobs_dir, data.get("job_id")) if data.get("job_id") else None
         LOG.info("training requested via dispatch", extra={"pattern_id": pattern_id, "job_id": data.get("job_id")})
-        job = run_pipeline(pattern_id, cfg=cfg, runner=runner, job=existing)
         jobs_run += 1
-        summary["trained"].append({"pattern_id": pattern_id, "job_id": job.job_id, "status": job.status})
+        try:
+            job = run_pipeline(pattern_id, cfg=cfg, runner=runner, job=existing)
+            summary["trained"].append({"pattern_id": pattern_id, "job_id": job.job_id, "status": job.status})
+        except Exception as e:  # never let one bad request wedge the queue
+            LOG.exception("pipeline crashed", extra={"pattern_id": pattern_id, "request": req.name})
+            summary["errors"].append({"request": req.name, "pattern_id": pattern_id, "error": str(e)})
         requests.ack(cfg, req)
 
     return summary

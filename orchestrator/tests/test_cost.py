@@ -222,3 +222,47 @@ def test_cli_cost_latency_flag(orch_env, capsys):
     data = json.loads(out)
     assert data["specialist"]["count"] == 1
     assert data["upstream"]["count"] == 1
+
+
+def test_parses_slog_nanosecond_timestamps(orch_env):
+    """Regression: the Go proxy's slog handler emits RFC3339 with fractional
+    seconds and a Z07:00 zone — the parser must accept those, not just '...Z'."""
+    cfg = orch_env
+    _write_proxy_log(cfg, [
+        {"time": "2026-05-20T10:00:00.123456789Z", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.01, "latency_ms": 100},
+        {"time": "2026-05-20T10:30:00.5Z", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.02, "latency_ms": 120},
+        {"time": "2026-05-20T11:00:00-04:00", "route_decision": "specialist",
+         "pattern_id": "p1", "cost_saved_usd": 0.03, "latency_ms": 140},
+    ])
+    buckets = cost.usage_over_time(cfg, "p1", bucket="hour")
+    # All three parsed (would be empty under the old strptime).
+    assert sum(b["requests"] for b in buckets) == 3
+
+
+def test_latency_counts_fallback_as_upstream(orch_env):
+    """fallback (specialist failed -> upstream) is upstream traffic, matching
+    the Go dashboard."""
+    cfg = orch_env
+    _write_proxy_log(cfg, [
+        {"time": "2026-05-20T10:00:00Z", "route_decision": "upstream",
+         "model": "claude", "latency_ms": 500},
+        {"time": "2026-05-20T10:01:00Z", "route_decision": "fallback",
+         "model": "claude", "latency_ms": 700},
+    ])
+    stats = cost.proxy_latency_stats(cfg)
+    assert stats["upstream"]["count"] == 2
+
+
+def test_all_patterns_roi_includes_proxy_only_pattern(orch_env):
+    """A pattern with savings but no training ledger entry still appears,
+    matching the Go no-filter ROI."""
+    cfg = orch_env
+    cost.record(cfg, "p1", "j1", 3600.0)
+    _write_proxy_log(cfg, [
+        {"time": "2026-05-20T10:00:00Z", "route_decision": "specialist",
+         "pattern_id": "p2", "cost_saved_usd": 0.05},
+    ])
+    results = cost.all_patterns_roi(cfg)
+    assert {r["pattern_id"] for r in results} == {"p1", "p2"}
