@@ -4,7 +4,7 @@
     "scope-enum": [2, "always", [
       "foundation", "observer", "detector", "dataset-builder", "trainer",
       "serving", "validator", "proxy", "skill", "instrumentation", "telegram",
-      "orchestrator", "demo", "docs", "ci", "build", "burst"
+      "orchestrator", "demo", "docs", "ci", "build", "burst", "deps"
     ]],
     "type-enum": [2, "always", [
       "feat", "fix", "docs", "chore", "refactor", "test", "ci", "build", "perf"

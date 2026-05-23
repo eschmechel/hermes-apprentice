@@ -9,6 +9,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "github.com/yalue/onnxruntime_go"
+        versions: [">=1.25"]
 
   - package-ecosystem: pip
     directories:
