@@ -18,7 +18,7 @@ jobs:
         module: [proxy, dataset-builder, registry-service, burst]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
       - uses: github/codeql-action/init@v3
