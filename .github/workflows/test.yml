@@ -17,7 +17,7 @@ jobs:
           go-version: '1.26'
       - run: go test ./... -coverprofile=coverage.out
         working-directory: ${{ matrix.module }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: go-coverage-${{ matrix.module }}
           path: ${{ matrix.module }}/coverage.out
@@ -36,7 +36,7 @@ jobs:
           pip install -e telegram -e trainer -e validator -e orchestrator -e serving pytest pytest-cov mcp
       - run: pytest tests/ -v --cov --cov-report=xml
         working-directory: ${{ matrix.pkg }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: py-coverage-${{ matrix.pkg }}
           path: ${{ matrix.pkg }}/coverage.xml
