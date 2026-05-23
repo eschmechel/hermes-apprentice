@@ -140,7 +140,7 @@ def _build_server():
                     pass
 
         # 2. Notify the operator about the merge candidate.
-        from . import candidates, notify as notify_mod
+        from . import candidates
 
         record_count_val = record_count or 0
         cid = candidates.write(cfg, merged_id, salt="merge",

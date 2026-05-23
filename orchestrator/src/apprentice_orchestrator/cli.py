@@ -91,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     q = sub.add_parser("quota", help="Tenant resource quota management.")
     q_sub = q.add_subparsers(dest="quota_cmd", required=True)
 
-    q_list = q_sub.add_parser("list", help="List all tenants.")
+    q_sub.add_parser("list", help="List all tenants.")
     q_get = q_sub.add_parser("get", help="Get quota for a tenant.")
     q_get.add_argument("--tenant-id", required=True)
     q_set = q_sub.add_parser("set", help="Update quota limits for a tenant.")
@@ -124,7 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
     bu_check.add_argument("--tenant-id", default="default")
     bu_check.add_argument("--gpu", default="A100", choices=list(flash_burst.FLASH_GPU_TYPES.keys()))
 
-    bu_list = bu_sub.add_parser("list", help="List available GPU types.")
+    bu_sub.add_parser("list", help="List available GPU types.")
     bu_prov = bu_sub.add_parser("provision", help="Provision a RunPod pod.")
     bu_prov.add_argument("--tenant-id", default="default")
     bu_prov.add_argument("--gpu", default="A100", choices=list(flash_burst.FLASH_GPU_TYPES.keys()))

@@ -35,7 +35,7 @@ class _CanaryHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         length = int(self.headers.get("Content-Length", 0))
-        body = json.loads(self.rfile.read(length)) if length else {}
+        _body = json.loads(self.rfile.read(length)) if length else {}
 
         if self.path == "/canary/advance":
             if self._advance_result:

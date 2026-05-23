@@ -11,8 +11,6 @@ from __future__ import annotations
 import gzip
 import json
 import logging
-import sys
-import textwrap
 from pathlib import Path
 
 import pytest

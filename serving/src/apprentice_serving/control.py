@@ -14,9 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 
 from .config_paths import adapter_path_resolver  # noqa: F401  (re-exported for callers)
 from .residency import AllPinnedError, ResidencyManager, VLLMAdminClient
